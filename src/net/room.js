@@ -34,6 +34,7 @@ export class Room {
 
     this.conns = new Map();   // connId -> { role, slot, token }
     this.seats = [];          // index = slot
+    this.reviveUsed = [];     // slot -> lifetime revives spent; bounds match length
     this.bots = 0;
     this.game = new Game();
     this.game.setViewport(VIRTUAL, VIRTUAL, 1);
@@ -313,6 +314,7 @@ export class Room {
       this.broadcast({ t: S.ERROR, msg: 'Need at least 2 players. Add a bot or wait for a join.' });
       return;
     }
+    this.reviveUsed = new Array(MAX_SEATS).fill(0);
     this.game.start(total, total - humans);
     this.seats.forEach((seat) => {
       const p = this.game.players[seat.slot];
@@ -413,10 +415,21 @@ export class Room {
     // A correct answer from an eliminated student buys them back into the
     // arena. This is the whole reason they answer at all.
     const revived = [];
-    if (QUIZ.reviveOnCorrect) {
-      for (const slot of result.right) {
-        const p = this.game.players[slot];
-        if (p && !p.alive && this.game.revive(slot, QUIZ.reviveLives)) revived.push(slot);
+    if (QUIZ.reviveOnCorrect && this.game.alivePlayers.length >= QUIZ.reviveMinAlive) {
+      const eligible = result.right
+        .filter((slot) => {
+          const p = this.game.players[slot];
+          return p && !p.alive && (this.reviveUsed[slot] || 0) < QUIZ.reviveMaxPerStudent;
+        })
+        // Students who have been back the fewest times go first, so one strong
+        // answerer cannot monopolise the way back in.
+        .sort((a, b) => (this.reviveUsed[a] || 0) - (this.reviveUsed[b] || 0));
+
+      for (const slot of eligible.slice(0, QUIZ.reviveMaxPerQuestion)) {
+        if (this.game.revive(slot, QUIZ.reviveLives)) {
+          this.reviveUsed[slot] = (this.reviveUsed[slot] || 0) + 1;
+          revived.push(slot);
+        }
       }
     }
 

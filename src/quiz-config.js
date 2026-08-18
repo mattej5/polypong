@@ -35,6 +35,16 @@ export const QUIZ = {
   // Eliminated students still answer; a correct answer is their way back in.
   reviveOnCorrect: true,
   reviveLives: 1,
+  // TERMINATION. Simulated against the real game: an uncapped revive never
+  // ends, and capping the *rate* does not fix it either -- a question fires
+  // after every elimination, so rate-capped revives just track the
+  // elimination rate and the match reaches equilibrium instead of finishing.
+  // A lifetime budget bounds the total lives in play, so the match is
+  // guaranteed to end and its length stops depending on how well the class
+  // knows the material. 2 finishes in ~8 min at every accuracy tested.
+  reviveMaxPerStudent: 2,    // lifetime revives per student. THIS is what terminates.
+  reviveMaxPerQuestion: 1,   // stops one easy question mass-reviving the field
+  reviveMinAlive: 4,         // no revives once the match is down to 3 -- clean endgame
 
   // ------------------------------------------------------------------ limits
   maxSets: 40,
