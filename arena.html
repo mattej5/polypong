@@ -38,4 +38,17 @@
   <span id="conn" class="conn">connected</span>
 </div>
 
+<!-- Projected question. DOM, not canvas — render.js is owned elsewhere, and
+     the class needs selectable, zoomable, screen-reader-visible text anyway.
+     Who answered what is NOT shown here unless the teacher opts in. -->
+<div id="quizwall" class="quizwall hidden" aria-live="polite">
+  <div class="quizwallcard">
+    <div class="qwhy" id="wallwhy"></div>
+    <div class="walltext" id="walltext"></div>
+    <ol class="wallopts" id="wallopts"></ol>
+    <div class="wallcount" id="wallcount"></div>
+    <div class="wallrows" id="wallrows"></div>
+  </div>
+</div>
+
 <script type="module" src="./src/arena.js"></script>

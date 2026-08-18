@@ -1,7 +1,17 @@
-export const COLORS = [
-  '#ff4d6d', '#4dd2ff', '#7cff4d', '#ffd24d',
-  '#b44dff', '#ff8f4d', '#4dffd2', '#ff4de0',
-];
+// Vector-CRT palette. Saturation and lightness are pinned and hue is the only
+// thing that changes per seat, so eight players read as one system instead of
+// eight unrelated swatches. The eight hues are spaced unevenly around the
+// wheel — wider through green/cyan, where the eye separates hue poorly, tighter
+// through red/amber, where it separates it well — and then ORDERED so that no
+// two seats sitting on neighbouring walls land in the same colour band. The
+// arena is a ring of the first N seats, so seat 3 sits next to seat 4 at every
+// player count; this order keeps every such pair at least 60 degrees apart for
+// every N from 2 to 8.
+const HUES = [288, 92, 228, 50, 192, 352, 152, 24];
+const SAT = 86;
+const LIGHT = 62;
+
+export const COLORS = HUES.map((h) => `hsl(${h}, ${SAT}%, ${LIGHT}%)`);
 
 // Key pairs: [counter-clockwise, clockwise]. In 2-player mode they read as [up, down].
 export const KEY_PAIRS = [
@@ -54,4 +64,14 @@ export const T = {
   hazardMargin: 0.14,        // fraction of arena radius kept clear of the walls
   hazardCenterClear: 0.30,   // hazards never sit on top of the serve point
   stallTimeout: 10,           // seconds before the round starts speeding up
+
+  // --- visual only, no gameplay effect ---------------------------------
+  // A CRT beam is the same stroke drawn a few times under `lighter`: wide and
+  // faint on the outside, thin and full-strength in the middle. Outermost first.
+  glowW: [4.6, 2.2, 1.0],     // lineWidth multipliers
+  glowA: [0.10, 0.26, 1.0],   // alpha multipliers
+  glowR: [2.4, 1.5, 1.0],     // radius multipliers, for dots
+  paddleWidth: 0.020,         // fraction of arena radius
+  wallWidth: 0.0045,
+  deadWallWidth: 0.0060,
 };

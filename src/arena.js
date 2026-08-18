@@ -1,6 +1,7 @@
 import { Game, STATE } from './game.js';
 import { render } from './render.js';
 import { C, S, decode, encode } from './net/protocol.js';
+import { LETTERS } from './quiz.js';
 
 const canvas = document.getElementById('stage');
 const ctx = canvas.getContext('2d');
@@ -33,6 +34,10 @@ function handle(msg) {
   if (!msg) return;
   if (msg.t === S.LOBBY) return onLobby(msg);
   if (msg.t === S.ERROR) return setErr(msg.msg);
+  if (msg.t === S.QUIZ_ASK) return wallAsk(msg);
+  if (msg.t === S.QUIZ_TICK) return wallTick(msg);
+  if (msg.t === S.QUIZ_END) return wallEnd(msg);
+  if (msg.t === S.QUIZ_OFF) return wallHide();
   if (msg.t === S.SNAP) {
     const prev = game.players.map((p) => p.lives);
     game.applySnapshot(msg.s);
@@ -51,6 +56,63 @@ function flashGoals(prevLives) {
     if (edge) game.sparks(edge.mid, p.color, 26);
     game.shake = Math.min(1, game.shake + 0.45);
   });
+}
+
+// ------------------------------------------------------------ projected quiz
+// The wall shows the question and a bare answered-count. Per-student
+// correct/incorrect belongs on the teacher's own screen (/admin) and only
+// reaches the projector if the teacher explicitly switches it on.
+
+const wall = document.getElementById('quizwall');
+const wallWhy = document.getElementById('wallwhy');
+const wallText = document.getElementById('walltext');
+const wallOpts = document.getElementById('wallopts');
+const wallCount = document.getElementById('wallcount');
+const wallRows = document.getElementById('wallrows');
+let wallQid = null;
+let wallHideTimer = null;
+
+function wallAsk(msg) {
+  if (wallHideTimer) { clearTimeout(wallHideTimer); wallHideTimer = null; }
+  wallQid = msg.qid;
+  wallWhy.textContent = msg.reason === 'elimination' ? 'AFTER AN ELIMINATION'
+    : msg.reason === 'volley' ? 'AFTER 3 VOLLEYS' : 'QUESTION';
+  wallText.textContent = msg.q;
+  wallOpts.innerHTML = '';
+  wallOpts.classList.toggle('two', msg.options.length === 2);
+  msg.options.forEach((o, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = '<b></b><span></span>';
+    li.querySelector('b').textContent = LETTERS[i];
+    li.querySelector('span').textContent = o;
+    wallOpts.appendChild(li);
+  });
+  wallCount.textContent = '0 answered';
+  wallRows.textContent = '';
+  wall.classList.remove('hidden');
+}
+
+function wallTick(msg) {
+  if (msg.qid !== wallQid) return;
+  wallCount.textContent = `${msg.answered} of ${msg.total} answered` +
+    (msg.overtime ? ' — still thinking' : '');
+}
+
+function wallEnd(msg) {
+  if (msg.qid !== wallQid) { wallHide(); return; }
+  [...wallOpts.children].forEach((li, i) => li.classList.toggle('right', i === msg.correct));
+  wallCount.textContent = `Answer: ${LETTERS[msg.correct]}. ${msg.options[msg.correct]}`;
+  // msg.rows only arrives when the teacher has opted in to projecting results.
+  wallRows.textContent = Array.isArray(msg.rows)
+    ? msg.rows.map((r) => `${r.name} ${r.choice === null ? '—' : r.correct ? '✓' : '✗'}`).join('   ')
+    : '';
+  wallHideTimer = setTimeout(wallHide, 4500);
+}
+
+function wallHide() {
+  if (wallHideTimer) { clearTimeout(wallHideTimer); wallHideTimer = null; }
+  wallQid = null;
+  wall.classList.add('hidden');
 }
 
 // --------------------------------------------------------------------- lobby

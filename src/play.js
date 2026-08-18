@@ -1,6 +1,7 @@
 import { Game, STATE } from './game.js';
 import { render } from './render.js';
 import { C, S, decode, encode } from './net/protocol.js';
+import { LETTERS } from './quiz.js';
 
 const game = new Game();
 game.replica = true;
@@ -56,8 +57,114 @@ function handle(msg) {
     game.applySnapshot(msg.s);
     lastSnapAt = performance.now();
     refreshStatus();
+    return;
+  }
+  if (msg.t === S.QUIZ_ASK) return quizAsk(msg);
+  if (msg.t === S.QUIZ_TICK) return quizTick(msg);
+  if (msg.t === S.QUIZ_END) return quizEnd(msg);
+  if (msg.t === S.QUIZ_OFF) return quizHide();
+}
+
+// --------------------------------------------------------------------- quiz
+// A DOM overlay, never the canvas: the text has to be selectable, focusable
+// and readable by a screen reader. Eliminated students get the same overlay —
+// answering is how they get back into the arena.
+
+const quizEl = document.getElementById('quiz');
+const qWhy = document.getElementById('qwhy');
+const qText = document.getElementById('qtext');
+const qOpts = document.getElementById('qopts');
+const qTimer = document.getElementById('qtimer');
+const qStatus = document.getElementById('qstatus');
+
+let quiz = null;          // { qid, options, locked }
+let hideTimer = null;
+
+function quizAsk(msg) {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  quiz = { qid: msg.qid, options: msg.options, locked: false, choice: null };
+
+  qWhy.textContent = msg.reason === 'elimination' ? 'QUESTION — after an elimination'
+    : msg.reason === 'volley' ? 'QUESTION — after 3 volleys'
+    : 'QUESTION';
+  qText.textContent = msg.q;
+  qTimer.textContent = '';
+  qStatus.textContent = msg.twoOption ? 'Pick one of two answers.' : 'Pick one answer.';
+
+  qOpts.innerHTML = '';
+  qOpts.classList.toggle('two', msg.options.length === 2);
+  msg.options.forEach((text, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'qopt';
+    b.setAttribute('aria-pressed', 'false');
+    b.innerHTML = `<span class="qletter">${LETTERS[i]}</span><span class="qlabel"></span>`;
+    b.querySelector('.qlabel').textContent = text;
+    b.addEventListener('click', () => choose(i));
+    qOpts.appendChild(b);
+  });
+
+  setDir(0);                       // never keep drifting while a question is up
+  quizEl.classList.remove('hidden');
+  const first = qOpts.querySelector('.qopt');
+  if (first) first.focus();
+}
+
+function choose(i) {
+  if (!quiz || quiz.locked) return;
+  quiz.locked = true;
+  quiz.choice = i;
+  [...qOpts.children].forEach((b, j) => {
+    b.setAttribute('aria-pressed', j === i ? 'true' : 'false');
+    b.classList.toggle('picked', j === i);
+    b.disabled = true;
+  });
+  qStatus.textContent = `Locked in ${LETTERS[i]}. Waiting for the rest of the class…`;
+  sendMsg({ t: C.ANSWER, qid: quiz.qid, c: i });
+}
+
+function quizTick(msg) {
+  if (!quiz || msg.qid !== quiz.qid) return;
+  qTimer.textContent = msg.overtime ? 'take your time' : `${msg.remaining}s`;
+  qTimer.classList.toggle('over', !!msg.overtime);
+  if (!quiz.locked) {
+    qStatus.textContent = `${msg.answered} of ${msg.total} answered — pick one answer.`;
   }
 }
+
+function quizEnd(msg) {
+  if (!quiz || msg.qid !== quiz.qid) { quizHide(); return; }
+  quiz.locked = true;
+  [...qOpts.children].forEach((b, j) => {
+    b.disabled = true;
+    b.classList.toggle('right', j === msg.correct);
+    b.classList.toggle('wrong', j === quiz.choice && j !== msg.correct);
+  });
+  qTimer.textContent = '';
+  const key = `${LETTERS[msg.correct]}. ${msg.options[msg.correct]}`;
+  qStatus.textContent =
+    msg.youWere === 'right' ? (msg.revived ? `Correct — you are back in the game!` : `Correct.`)
+    : msg.youWere === 'missed' ? `Time. The answer was ${key}.`
+    : `Not this time. The answer was ${key}.`;
+  if (msg.targeted) qStatus.textContent += ' Watch your wall on the next serve.';
+  hideTimer = setTimeout(quizHide, 4000);
+}
+
+function quizHide() {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  quiz = null;
+  quizEl.classList.add('hidden');
+}
+
+const quizOpen = () => !!quiz && !quizEl.classList.contains('hidden');
+
+// 1-4 pick an answer. Letters are deliberately NOT bound: A and D drive the
+// paddle, and a student reaching for "A" mid-question must not steer.
+addEventListener('keydown', (e) => {
+  if (!quizOpen() || quiz.locked) return;
+  const n = Number(e.key);
+  if (n >= 1 && n <= quiz.options.length) { e.preventDefault(); choose(n - 1); }
+});
 
 // -------------------------------------------------------------------- status
 
@@ -118,6 +225,7 @@ const KEYS_L = new Set(['ArrowLeft', 'KeyA']);
 const KEYS_R = new Set(['ArrowRight', 'KeyD']);
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
+  if (quizOpen()) return;   // arrow keys belong to the question overlay
   if (KEYS_L.has(e.code)) { e.preventDefault(); setDir(-1); }
   if (KEYS_R.has(e.code)) { e.preventDefault(); setDir(1); }
 });

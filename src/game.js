@@ -24,7 +24,10 @@ export class Game {
     this.splitter = null;
     this.shake = 0;
     this.round = 0;
+    this.volleys = 0;          // completed rallies; the quiz cadence counts these
     this.eliminations = 0;
+    this.serveTarget = null;   // player idx the next serve is aimed at, or null
+    this.servedAt = null;      // who the live serve was actually aimed at
     this.pending = [];
     this.paused = false;
     this.winner = null;
@@ -91,7 +94,10 @@ export class Game {
     this.splitter = null;
     this.pending = [];
     this.round = 0;
+    this.volleys = 0;
     this.eliminations = 0;
+    this.serveTarget = null;
+    this.servedAt = null;
     this.winner = null;
     this.paused = false;
     this.aim = null;
@@ -150,9 +156,60 @@ export class Game {
   serve() {
     this.round++;
     this.roundTime = 0;
-    const ang = Math.random() * Math.PI * 2;
+
+    // A serve is normally a random angle. When the room has nominated a target
+    // (a student who missed the last question) the ball is aimed straight down
+    // the middle of that student's own wall instead. The room owns the fairness
+    // rules for who may be nominated; the game only honours one nomination and
+    // then forgets it, so a stale target can never repeat by itself.
+    const target = this.serveTarget;
+    this.serveTarget = null;
+    this.servedAt = null;
+
+    let ang = null;
+    if (target !== null && target !== undefined) {
+      const p = this.players[target];
+      if (p && p.alive && p.edge) {
+        const d = G.sub(p.edge.mid, this.arena.center);
+        ang = Math.atan2(d.y, d.x);
+        this.servedAt = target;
+      }
+    }
+    if (ang === null) ang = Math.random() * Math.PI * 2;
+
     this.balls = [makeBall(this.arena.center, this.viewport.R, ang)];
     if (this.round % T.splitEvery === 0) this.spawnSplitter();
+  }
+
+  /**
+   * Nominate the player whose wall the next serve is aimed at. Transport
+   * agnostic, like setInput: the room calls it, nothing else does. Returns
+   * false if the player cannot be aimed at (gone, eliminated, no wall yet).
+   */
+  setServeTarget(playerIdx) {
+    const p = this.players[playerIdx];
+    if (!p || !p.alive) return false;
+    this.serveTarget = playerIdx;
+    return true;
+  }
+
+  /**
+   * Put an eliminated student back in the arena. Their route back is answering
+   * a question correctly, so this is driven by the room, never by physics.
+   */
+  revive(playerIdx, lives = 1) {
+    const p = this.players[playerIdx];
+    if (!p || p.alive) return false;
+    if (this.state === STATE.MENU || this.state === STATE.GAMEOVER) return false;
+    p.alive = true;
+    p.lives = Math.max(1, lives | 0);
+    p.paddle = null;
+    // They are back in play, so they no longer get the consolation hazard.
+    const hadHead = this.pending.length && this.pending[0].player.idx === playerIdx;
+    this.pending = this.pending.filter((j) => j.player.idx !== playerIdx);
+    if (hadHead) { this.aim = null; this.ghost = null; this.placeRequested = false; }
+    this.rebuildArena();
+    return true;
   }
 
   spawnSplitter() {
@@ -274,6 +331,7 @@ export class Game {
 
     if (this.balls.length === 0 && this.state === STATE.PLAYING && !(this.serveTimer > 0)) {
       this.serveTimer = T.serveDelay;
+      this.volleys++;   // a rally just ended; the quiz cadence watches this
     }
   }
 
