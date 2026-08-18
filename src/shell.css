@@ -1,0 +1,82 @@
+:root {
+  --bg: #070911;
+  --panel: rgba(14,18,32,0.94);
+  --line: rgba(120,160,255,0.18);
+  --text: #dbe6ff;
+  --dim: #8091b8;
+  --accent: #4dd2ff;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+body { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--text); }
+canvas { display: block; }
+
+.overlay {
+  position: fixed; inset: 0; display: grid; place-items: center; padding: 20px;
+  background: radial-gradient(circle at 50% 45%, rgba(30,45,90,0.55), rgba(5,6,12,0.96));
+}
+
+.panel {
+  width: min(560px, 94vw); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 14px; padding: 26px 28px 24px; box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+}
+.panel.wide { width: min(780px, 94vw); }
+h1 { margin: 0; font-size: 40px; letter-spacing: 6px; }
+h1 span { color: var(--accent); }
+.tag { margin: 6px 0 18px; color: var(--dim); font-size: 13px; letter-spacing: 1px; }
+
+.joinbox { border: 1px dashed var(--line); border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; }
+.joinlabel { font-size: 11px; letter-spacing: 2px; color: var(--dim); }
+.joinurl { font-size: clamp(22px, 4.2vw, 40px); font-weight: 700; color: var(--accent); word-break: break-all; }
+
+.seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.seat { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+.seat.off { opacity: 0.4; }
+.dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+.empty { color: var(--dim); font-size: 13px; margin-bottom: 12px; }
+
+.row { display: flex; gap: 14px; align-items: flex-end; }
+.field { flex: 1; }
+label { display: block; font-size: 11px; letter-spacing: 1.5px; color: var(--dim); margin-bottom: 6px; }
+select, input {
+  width: 100%; padding: 12px; font: inherit; font-size: 16px; color: var(--text);
+  background: #0d1120; border: 1px solid var(--line); border-radius: 8px; appearance: none;
+}
+button {
+  width: 100%; padding: 13px; font: inherit; font-weight: 700; font-size: 16px;
+  letter-spacing: 3px; color: #04121a; cursor: pointer; background: var(--accent);
+  border: 0; border-radius: 8px;
+}
+button:hover { filter: brightness(1.12); }
+button:disabled { opacity: 0.45; cursor: default; filter: none; }
+.err { color: #ff6b8a; font-size: 13px; min-height: 18px; margin-top: 10px; }
+
+.teacherbar { position: fixed; top: 12px; left: 12px; display: flex; gap: 8px; align-items: center; z-index: 5; }
+.mini { width: auto; padding: 7px 14px; font-size: 12px; letter-spacing: 2px; background: rgba(120,160,255,0.14); color: var(--text); }
+.conn { font-size: 11px; color: var(--dim); letter-spacing: 1px; }
+
+/* ------------------------------------------------------------- controller */
+.pad { position: fixed; inset: 0; display: flex; flex-direction: column; }
+.padtop { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.padname { font-weight: 700; font-size: 15px; }
+.padlives { display: flex; gap: 5px; margin-left: auto; }
+.pip { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid currentColor; }
+.pip.on { background: currentColor; }
+.padview { flex: 1; min-height: 0; position: relative; }
+.padview canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.padstatus {
+  position: absolute; left: 0; right: 0; bottom: 8px; text-align: center;
+  font-size: 13px; color: var(--dim); pointer-events: none;
+}
+.padbtns { display: flex; gap: 10px; padding: 10px 12px 16px; }
+.big {
+  flex: 1; height: clamp(74px, 17vh, 130px); font-size: 34px; letter-spacing: 0;
+  background: rgba(120,160,255,0.16); color: var(--text); border: 1px solid var(--line);
+  touch-action: none; user-select: none;
+}
+.big.active { background: var(--accent); color: #04121a; }
+.drop { display: none; }
+.drop.show { display: block; }
+
+/* keep last: must beat the display rules above */
+.hidden { display: none !important; }

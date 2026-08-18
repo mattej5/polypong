@@ -1,0 +1,41 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>POLYPONG — Arena</title>
+<link rel="stylesheet" href="./src/shell.css" />
+
+<canvas id="stage"></canvas>
+
+<div id="lobby" class="overlay">
+  <div class="panel wide">
+    <h1>POLY<span>PONG</span></h1>
+    <div class="tag">students join from any browser on this network</div>
+
+    <div class="joinbox">
+      <div class="joinlabel">JOIN AT</div>
+      <div id="joinurl" class="joinurl">…</div>
+    </div>
+
+    <div id="seats" class="seats"></div>
+    <div id="empty" class="empty">Waiting for students to join…</div>
+
+    <div class="row">
+      <div class="field">
+        <label>FILL WITH BOTS</label>
+        <select id="bots"></select>
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button id="start">START GAME</button>
+      </div>
+    </div>
+    <div id="err" class="err"></div>
+  </div>
+</div>
+
+<div id="hud" class="teacherbar hidden">
+  <button id="pause" class="mini">PAUSE</button>
+  <button id="reset" class="mini">END GAME</button>
+  <span id="conn" class="conn">connected</span>
+</div>
+
+<script type="module" src="./src/arena.js"></script>
