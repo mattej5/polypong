@@ -34,6 +34,15 @@
   </div>
 </div>
 
+<!-- End of match. Shown to every student, including the ones knocked out early:
+     they stay seated for the rematch, so the screen must not just go quiet. -->
+<div id="over" class="over hidden" aria-live="polite">
+  <div class="overcard">
+    <div class="overwho" id="overwho"></div>
+    <div class="oversub" id="oversub"></div>
+  </div>
+</div>
+
 <!-- Question overlay. Deliberately DOM, not canvas: real text selection, real
      focus order, and a screen reader can actually read it. -->
 <div id="quiz" class="quiz hidden" role="dialog" aria-modal="true" aria-labelledby="qtext">

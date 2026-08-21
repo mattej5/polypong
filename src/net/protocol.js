@@ -13,7 +13,11 @@ export const C = {
   CONFIG: 'cfg',    // { bots }            display only
   START: 'start',   // {}                  display only
   PAUSE: 'pause',   // { on }              display only
-  RESET: 'reset',   // {}                  display only
+  RESET: 'reset',   // {}                  display only  -> back to the lobby
+  REMATCH: 'again', // {}                  display only  -> straight into a new
+                    // match on the same roster. Distinct from RESET because a
+                    // teacher running four matches in a period must not have to
+                    // re-seat the class, and students must not have to rejoin.
 
   // quiz — students
   ANSWER: 'ans',        // { qid, c: 0..3 }
@@ -31,7 +35,12 @@ export const C = {
 export const S = {
   WELCOME: 'welcome', // { id, role, slot, token, protocol }
   LOBBY: 'lobby',     // { seats:[{slot,name,color,connected,bot}], bots, state }
-  SNAP: 'snap',       // { s: <Game.snapshot()> }
+  // `c` is the room's own accumulated simulation clock in seconds — not a wall
+  // clock, just the sum of the dt it has been ticked with. Clients interpolate
+  // against it instead of against local arrival times, so network jitter never
+  // reaches the render clock. Absent on servers older than this field; clients
+  // fall back to synthesising a timeline from the measured snapshot interval.
+  SNAP: 'snap',       // { s: <Game.snapshot()>, c: seconds }
   ERROR: 'err',       // { msg }
 
   // quiz — everyone. Never carries the answer key while a question is open.

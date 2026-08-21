@@ -1,10 +1,20 @@
 import { Game, STATE } from './game.js';
 import { render } from './render.js';
 import { C, S, decode, encode } from './net/protocol.js';
+import { SnapshotStream } from './net/interp.js';
+import { PaddlePredictor } from './net/predict.js';
+import { T, COLORS } from './config.js';
 import { LETTERS } from './quiz.js';
 
 const game = new Game();
 game.replica = true;
+
+// The world is rendered from interpolated snapshots, a little in the past.
+// Your own paddle is not: it is predicted forward to now, so a key press moves
+// it on the very next frame instead of after a round trip.
+const stream = new SnapshotStream();
+const predictor = new PaddlePredictor();
+const nowSec = () => performance.now() / 1000;
 
 const joinEl = document.getElementById('join');
 const padEl = document.getElementById('pad');
@@ -19,7 +29,6 @@ const ctx = canvas.getContext('2d');
 const KEY = 'polypong.token';
 let me = { slot: null, color: '#fff', name: '' };
 let socket = null;
-let lastSnapAt = 0;
 
 // ------------------------------------------------------------------ transport
 
@@ -50,13 +59,17 @@ function handle(msg) {
     livesEl.style.color = me.color;
     joinEl.classList.add('hidden');
     padEl.classList.remove('hidden');
+    predictor.reset();
     resize();
     return;
   }
   if (msg.t === S.SNAP) {
-    game.applySnapshot(msg.s);
-    lastSnapAt = performance.now();
-    refreshStatus();
+    stream.push(msg.c, msg.s);
+    // Prediction anchors on the newest raw snapshot, never on the interpolated
+    // one: everything after the anchor is replayed from the local input log, so
+    // the anchor wants to be as fresh as it can be.
+    const mine = me.slot === null ? null : msg.s.pl[me.slot];
+    if (mine) predictor.onAuthoritative(mine.s, nowSec());
     return;
   }
   if (msg.t === S.QUIZ_ASK) return quizAsk(msg);
@@ -166,6 +179,26 @@ addEventListener('keydown', (e) => {
   if (n >= 1 && n <= quiz.options.length) { e.preventDefault(); choose(n - 1); }
 });
 
+// ------------------------------------------------------------------- victory
+// Everyone sees who won, including students eliminated in the first minute.
+// Going quiet on them is how a class stops paying attention to the screen.
+
+const overEl = document.getElementById('over');
+const overWho = document.getElementById('overwho');
+const overSub = document.getElementById('oversub');
+
+function refreshVictory() {
+  const on = game.state === STATE.GAMEOVER;
+  overEl.classList.toggle('hidden', !on);
+  if (!on) return;
+  const w = game.winner;
+  overWho.textContent = w ? `${w.name} WINS` : 'GAME OVER';
+  overWho.style.color = w ? (w.color || COLORS[w.idx]) : '#fff';
+  overSub.textContent = w && w.idx === me.slot
+    ? 'that was you — keep your seat, the next match starts on the arena screen'
+    : 'keep your seat — the next match starts on the arena screen';
+}
+
 // -------------------------------------------------------------------- status
 
 function refreshStatus() {
@@ -204,6 +237,9 @@ let dir = 0;
 function setDir(d) {
   if (d === dir) return;
   dir = d;
+  // Tell the predictor before the network, not after: the point of prediction
+  // is that the paddle has already moved by the time the packet leaves.
+  predictor.setDir(d, nowSec());
   sendMsg({ t: C.INPUT, d });
   document.getElementById('left').classList.toggle('active', d === -1);
   document.getElementById('right').classList.toggle('active', d === 1);
@@ -274,13 +310,49 @@ function resize() {
 }
 addEventListener('resize', resize);
 
+/**
+ * Overwrite the local player's interpolated paddle with the predicted one.
+ * Everyone else's paddle stays on the interpolated clock, which is correct:
+ * their input has not reached us yet, and guessing at it would be a guess.
+ */
+function applyOwnPrediction() {
+  if (me.slot === null) return;
+  const p = game.players[me.slot];
+  if (!p || !p.alive || !p.paddle || !p.edge) return;
+  const len = p.edge.length;
+  if (!(len > 0)) return;
+  const f = predictor.predict(nowSec(), {
+    speed: T.paddleSpeed,
+    min: p.paddle.min / len,
+    max: p.paddle.max / len,
+  });
+  if (f === null) return;
+  p.paddle.s = Math.min(p.paddle.max, Math.max(p.paddle.min, f * len));
+}
+
 let last = performance.now();
+let statusKey = '';
 function frame(now) {
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
-  if (game.state === STATE.PLAYING && now - lastSnapAt < 250) {
-    for (const b of game.balls) { b.p.x += b.v.x * dt; b.p.y += b.v.y * dt; }
+
+  const snap = stream.advance(dt);
+  if (snap) {
+    game.applySnapshot(snap);
+    applyOwnPrediction();
+    game.pushTrails();
+
+    // refreshStatus rewrites DOM, so it runs on change rather than every frame.
+    const p = game.players[me.slot];
+    const job = game.pending[0];
+    const key = `${game.state}|${p ? p.lives : ''}|${p ? p.alive : ''}|${job ? job.player.idx : ''}|${game.winner ? game.winner.idx : ''}`;
+    if (key !== statusKey) {
+      statusKey = key;
+      refreshStatus();
+      refreshVictory();
+    }
   }
+
   game.update(dt);
   render(ctx, game, now / 1000);
   requestAnimationFrame(frame);
@@ -288,3 +360,4 @@ function frame(now) {
 resize();
 requestAnimationFrame(frame);
 window.game = game;
+window.net = { stream, predictor };

@@ -98,6 +98,7 @@ export class Game {
     this.eliminations = 0;
     this.serveTarget = null;
     this.servedAt = null;
+    this.serveTimer = 0;   // a rematch must not inherit the last match's clock
     this.winner = null;
     this.paused = false;
     this.aim = null;
@@ -584,7 +585,12 @@ export class Game {
         n: p.name,
         s: p.paddle && p.edge ? +(p.paddle.s / p.edge.length).toFixed(4) : 0.5,
       })),
+      // `i` is the ball's identity, not its slot. Clients interpolate between
+      // consecutive snapshots, and array position is not stable across a split
+      // or a goal — matching by index would blend two different balls together
+      // and send one skating across the arena.
       bl: this.balls.map((b) => ({
+        i: b.id,
         p: this.toArena(b.p),
         v: [+(b.v.x / this.viewport.R).toFixed(3), +(b.v.y / this.viewport.R).toFixed(3)],
         h: b.hot > 0 ? 1 : 0,
@@ -616,7 +622,14 @@ export class Game {
       p.name = q.n;
     });
 
-    this.rebuildArena(true);
+    // Interpolating clients apply a snapshot every animation frame rather than
+    // every 50ms, so the arena is only rebuilt when its shape actually changed.
+    // Geometry depends on nothing but the alive set and the viewport.
+    const shape = `${s.pl.map((q) => q.a).join('')}|${this.viewport.R}|${this.viewport.cx}|${this.viewport.cy}`;
+    if (!this.arena || shape !== this._shapeKey) {
+      this.rebuildArena(true);
+      this._shapeKey = shape;
+    }
     s.pl.forEach((q) => {
       const p = this.players[q.i];
       if (p.alive && p.paddle && p.edge) {
@@ -624,10 +637,15 @@ export class Game {
       }
     });
 
+    // Carry trails across by ball identity, not array position, for the same
+    // reason the wire sends an id: index 0 after a goal is a different ball.
+    const prevBalls = new Map();
+    for (const b of this.balls) prevBalls.set(b.id, b);
     this.balls = s.bl.map((b, i) => {
-      const prev = this.balls[i];
+      const id = b.i === undefined ? i : b.i;
+      const prev = prevBalls.get(id);
       return {
-        id: i,
+        id,
         p: this.fromArena(b.p),
         v: { x: b.v[0] * R, y: b.v[1] * R },
         r: R * T.ballRadius,
@@ -651,6 +669,21 @@ export class Game {
     this.timer = s.tm;
     this.round = s.rd;
     this.banner = s.bn;
+  }
+
+  /**
+   * Replica-side trail growth. The authoritative sim grows trails inside
+   * stepBalls; a replica has no sim, so the client calls this once per rendered
+   * frame. That way the tail follows the *rendered* path, which under
+   * interpolation is the only path the viewer ever sees.
+   */
+  pushTrails(limit = 14) {
+    for (const b of this.balls) {
+      const last = b.trail[b.trail.length - 1];
+      if (last && Math.abs(last.x - b.p.x) < 0.01 && Math.abs(last.y - b.p.y) < 0.01) continue;
+      b.trail.push({ x: b.p.x, y: b.p.y });
+      if (b.trail.length > limit) b.trail.shift();
+    }
   }
 
   // --------------------------------------------------------------- particles

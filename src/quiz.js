@@ -8,99 +8,177 @@ import { QUIZ } from './quiz-config.js';
 export const LETTERS = ['A', 'B', 'C', 'D'];
 
 // ---------------------------------------------------------------------- CSV
+// One reader for every way a question can arrive: pasted text, an uploaded
+// .csv, an uploaded .tsv, and the hand-written form. admin.js does the file
+// reading and hands the text in here, so the teacher's preview and Room's
+// parse always run the same code.
+
+/** Drops a leading UTF-8 BOM. Sheets and Excel both like to add one. */
+export function normaliseText(text) {
+  const s = String(text ?? '');
+  return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
+}
 
 /**
- * RFC4180-ish reader. Handles quoted fields, embedded commas, doubled quotes
- * and CRLF, because a teacher pasting out of Sheets will produce all four.
- * Returns an array of rows; each row is an array of raw cell strings.
+ * Tabs or commas? "Download as TSV" is one menu item away in Sheets, and
+ * Excel's "Unicode Text" export is tab separated too. Decided on the first
+ * non-empty line: whichever separator shows up more often outside quotes
+ * wins, and a tie goes to the comma.
  */
-export function parseCsvRows(text) {
+export function sniffDelimiter(text) {
+  const src = normaliseText(text);
+  let commas = 0;
+  let tabs = 0;
+  let quoted = false;
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (quoted) {
+      if (ch === '"') { if (src[i + 1] === '"') i++; else quoted = false; }
+      continue;
+    }
+    if (ch === '"') { quoted = true; continue; }
+    if (ch === ',') commas++;
+    else if (ch === '\t') tabs++;
+    else if (ch === '\n' && (commas || tabs)) break;
+  }
+  return tabs > commas ? '\t' : ',';
+}
+
+/**
+ * RFC4180-ish reader. Handles quoted fields, embedded separators, doubled
+ * quotes, CRLF, trailing blank lines and a BOM, because a teacher exporting
+ * from Sheets or Excel will produce all of them.
+ *
+ * Returns [{ cells, line }]. `line` is the real 1-based line number in the
+ * teacher's file, counted before blank rows are dropped, so an error message
+ * can point at the row they are actually looking at in the spreadsheet.
+ */
+export function readDelimited(text, delimiter) {
+  const src = normaliseText(text);
+  const delim = delimiter || sniffDelimiter(src);
   const rows = [];
   let row = [];
   let cell = '';
   let quoted = false;
   let started = false;   // this cell has at least one character or quote
+  let line = 1;          // the line this row started on
+  let nextLine = 1;      // the line the cursor is on
 
   const endCell = () => { row.push(cell); cell = ''; started = false; };
-  const endRow = () => { endCell(); rows.push(row); row = []; };
+  const endRow = () => { endCell(); rows.push({ cells: row, line }); row = []; line = nextLine; };
 
-  const src = String(text ?? '');
   for (let i = 0; i < src.length; i++) {
     const ch = src[i];
     if (quoted) {
       if (ch === '"') {
         if (src[i + 1] === '"') { cell += '"'; i++; }
         else quoted = false;
-      } else cell += ch;
+      } else {
+        if (ch === '\n') nextLine++;
+        cell += ch;
+      }
       continue;
     }
     if (ch === '"' && !started) { quoted = true; started = true; continue; }
-    if (ch === ',') { endCell(); continue; }
+    if (ch === delim) { endCell(); continue; }
     if (ch === '\r') continue;
-    if (ch === '\n') { endRow(); continue; }
+    if (ch === '\n') { nextLine++; endRow(); continue; }
     cell += ch;
     started = true;
   }
   if (cell !== '' || row.length) endRow();
-  return rows.filter((r) => r.some((c) => String(c).trim() !== ''));
+  return rows.filter((r) => r.cells.some((c) => String(c).trim() !== ''));
+}
+
+/** Older shape: rows as plain arrays of cells, blank rows already dropped. */
+export function parseCsvRows(text, delimiter) {
+  return readDelimited(text, delimiter).map((r) => r.cells);
 }
 
 const trimField = (v) => String(v ?? '').trim().slice(0, QUIZ.maxFieldChars);
 
+export const CSV_HEADER = 'question,a,b,c,d,correct,topic';
+
 /**
- * question,a,b,c,d,correct,topic
+ * The one place that decides what a valid question is. The CSV reader calls
+ * it per row and the hand-written form calls it per question, so an uploaded
+ * row and a typed row can never be judged by different rules.
+ *
+ * fields: { q, a, b, c, d, correct, topic }.
+ * Returns { question } or { error: { line, field, msg } }. `msg` is written
+ * for a teacher, not a developer: it names the column and says what to do.
+ *
+ * Leaving BOTH c and d blank gives a 2-option question. That is the
+ * accessibility mode, not a degenerate row, so it passes with no complaint.
+ * Filling in only one of them is the mistake, and it is reported.
+ */
+export function buildQuestion(fields, line = 0) {
+  const q = trimField(fields.q);
+  const a = trimField(fields.a);
+  const b = trimField(fields.b);
+  const c = trimField(fields.c);
+  const d = trimField(fields.d);
+  const topic = trimField(fields.topic);
+  const correctRaw = String(fields.correct ?? '').trim();
+  const bad = (field, msg) => ({ error: { line, field, msg } });
+
+  if (!q) return bad('q', 'the question column is empty — type the question a student will read');
+  if (!a && !b) return bad('a', 'options a and b are both empty — every question needs at least two options');
+  if (!a) return bad('a', 'option a is empty — fill it in, or move option b up into a');
+  if (!b) return bad('b', 'option b is empty — a question needs at least two options');
+
+  const options = [a, b];
+  if (c && d) options.push(c, d);
+  else if (c || d) {
+    const filled = c ? 'c' : 'd';
+    const blank = c ? 'd' : 'c';
+    return bad(blank, `option ${filled} is filled in but option ${blank} is blank — ` +
+      `either fill in ${blank} as well, or clear ${filled} to make this a two-option question`);
+  }
+
+  const key = correctRaw.toUpperCase();
+  let correct = LETTERS.indexOf(key);
+  if (correct < 0 && /^[1-4]$/.test(key)) correct = Number(key) - 1;
+  if (correct < 0) {
+    return bad('correct', correctRaw
+      ? `the correct answer says "${correctRaw}" — it has to be the letter A, B, C or D`
+      : 'the correct answer is blank — put in the letter A, B, C or D of the right option');
+  }
+  if (correct >= options.length) {
+    return bad('correct', `the correct answer is ${LETTERS[correct]}, but this question only has ` +
+      `${options.length} options (${LETTERS.slice(0, options.length).join(' and ')})`);
+  }
+
+  return { question: { q, options, correct, topic } };
+}
+
+/**
+ * question,a,b,c,d,correct,topic — comma or tab separated, sniffed.
  *
  * `correct` is a letter A-D (case-insensitive; a bare 1-4 is accepted too
- * because teachers type it). `topic` is optional. Leaving c and d blank gives
- * a 2-option question — that is the accessibility mode, not a degenerate row,
- * so it parses clean with no warning.
+ * because teachers type it). `topic` is optional.
  *
  * Returns { questions, errors, skippedHeader }. Bad rows are reported with
  * their 1-based line number and never silently dropped.
  */
-export function parseQuestionCsv(text) {
-  const rows = parseCsvRows(text);
+export function parseQuestionCsv(text, delimiter) {
+  const rows = readDelimited(text, delimiter);
   const questions = [];
   const errors = [];
   let skippedHeader = false;
 
   rows.forEach((raw, idx) => {
-    const line = idx + 1;
-    const cells = raw.map(trimField);
-
+    const cells = raw.cells.map(trimField);
     if (idx === 0 && /^question$/i.test(cells[0] || '')) { skippedHeader = true; return; }
 
-    const [q, a, b, c, d, correctRaw, topic] = cells;
-    if (!q) { errors.push({ line, msg: 'no question text' }); return; }
-    if (!a || !b) { errors.push({ line, msg: 'needs at least two options (a and b)' }); return; }
-
-    const options = [a, b];
-    if (c && d) options.push(c, d);
-    else if (c || d) {
-      errors.push({ line, msg: 'for a 2-option question leave BOTH c and d blank' });
-      return;
-    }
-
-    const key = String(correctRaw || '').trim().toUpperCase();
-    let correct = LETTERS.indexOf(key);
-    if (correct < 0 && /^[1-4]$/.test(key)) correct = Number(key) - 1;
-    if (correct < 0) {
-      errors.push({ line, msg: `correct answer must be a letter A-D, got "${correctRaw || ''}"` });
-      return;
-    }
-    if (correct >= options.length) {
-      errors.push({
-        line,
-        msg: `correct answer is ${LETTERS[correct]} but this question only has ${options.length} options`,
-      });
-      return;
-    }
-
-    questions.push({ q, options, correct, topic: topic || '' });
+    const [q, a, b, c, d, correct, topic] = cells;
+    const { question, error } = buildQuestion({ q, a, b, c, d, correct, topic }, raw.line);
+    if (error) errors.push(error);
+    else questions.push(question);
   });
 
   if (questions.length > QUIZ.maxQuestionsPerSet) {
-    errors.push({ line: 0, msg: `set truncated to ${QUIZ.maxQuestionsPerSet} questions` });
+    errors.push({ line: 0, field: '', msg: `set truncated to ${QUIZ.maxQuestionsPerSet} questions` });
     questions.length = QUIZ.maxQuestionsPerSet;
   }
   return { questions, errors, skippedHeader };
@@ -108,13 +186,12 @@ export function parseQuestionCsv(text) {
 
 /** Round-trips a parsed set back to CSV so the admin page can re-edit it. */
 export function questionsToCsv(questions) {
-  const esc = (v) => (/[",\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
-  const head = 'question,a,b,c,d,correct,topic';
-  const body = questions.map((q) => [
+  const esc = (v) => (/[",\t\r\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+  const body = (questions || []).map((q) => [
     q.q, q.options[0], q.options[1], q.options[2] || '', q.options[3] || '',
     LETTERS[q.correct], q.topic || '',
   ].map(esc).join(','));
-  return [head, ...body].join('\n');
+  return [CSV_HEADER, ...body].join('\n');
 }
 
 // ------------------------------------------------------------------- engine

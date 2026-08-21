@@ -1,0 +1,127 @@
+/* Teacher console extras: the set builder. Tokens come from shell.css, which
+   this lane does not own — nothing here redefines one. Sized for a 1366x768
+   Chromebook: the builder and the preview sit side by side above 1150px and
+   stack below it, and every hit target is comfortable under a trackpad. */
+
+/* ------------------------------------------------------------------ import */
+.importbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 10px 12px; margin-bottom: 8px;
+  border: 1px dashed var(--line); border-radius: 8px;
+}
+.importbar .mini { flex: none; }
+.importbar span { flex: 1; min-width: 220px; }
+.filenote { min-height: 16px; color: var(--dim); margin-bottom: 8px; }
+.filenote.ok { color: var(--accent); }
+.filenote.bad { color: #ff6b8a; }
+
+.dropveil {
+  position: fixed; inset: 0; z-index: 40; display: grid; place-items: center;
+  background: rgba(4, 6, 14, 0.86); pointer-events: none;
+}
+.dropcard {
+  padding: 40px 60px; border: 2px dashed var(--accent); border-radius: 16px;
+  background: var(--panel); color: var(--accent);
+  font-size: 22px; letter-spacing: 4px; text-align: center;
+}
+.dropcard small {
+  display: block; margin-top: 8px;
+  font-size: 12px; letter-spacing: 2px; color: var(--dim);
+}
+
+/* -------------------------------------------------------------- two panes */
+.editsplit { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 1150px) {
+  .editsplit { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+.editcol { min-width: 0; }
+
+.tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.tabs .tab { opacity: 0.6; border-bottom: 2px solid transparent; }
+.tabs .tab.on {
+  opacity: 1; color: #04121a; background: var(--accent);
+}
+
+/* -------------------------------------------------------- question list */
+.qlist {
+  display: grid; gap: 6px;
+  max-height: 46vh; overflow-y: auto;
+  padding-right: 4px;
+}
+/* A 768px-tall Chromebook cannot show the whole question form inside a
+   scrolling list box, so the list gives up its cap while the form is open. */
+.qlist.editing { max-height: none; overflow-y: visible; }
+.qempty {
+  padding: 18px 14px; text-align: center; color: var(--dim); font-size: 13px;
+  border: 1px dashed var(--line); border-radius: 8px;
+}
+.qrow {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+  font-size: 13px;
+}
+.qrow.bad { border-color: #ff6b8a; }
+.qnum { flex: none; width: 22px; color: var(--dim); text-align: right; }
+.qmain { flex: 1; min-width: 0; }
+.qmain .qhead { line-height: 1.35; word-break: break-word; }
+.qmain .qsub {
+  margin-top: 3px; font-size: 12px; color: var(--dim);
+  word-break: break-word; line-height: 1.4;
+}
+.qtag {
+  display: inline-block; margin-left: 6px; padding: 0 6px;
+  border: 1px solid var(--line); border-radius: 4px;
+  font-size: 10px; letter-spacing: 1px; color: var(--dim);
+}
+.qbtns { flex: none; display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.qbtns .mini { width: auto; padding: 5px 8px; font-size: 11px; letter-spacing: 1px; }
+.qbtns .mini.move { min-width: 30px; letter-spacing: 0; font-size: 13px; }
+
+/* --------------------------------------------------------- question form */
+.qform {
+  padding: 12px; border: 1px solid var(--accent); border-radius: 8px;
+  background: rgba(77, 210, 255, 0.04);
+}
+.qform label { margin-top: 10px; }
+.qform > label:first-child { margin-top: 0; }
+.qform textarea { font-size: 14px; }
+.qform input[type="text"] { font-size: 14px; padding: 9px 10px; }
+.optrow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+/* shell.css strips `appearance` off every input, which leaves a radio as a
+   blank square with no visible checked state -- fatal here, because that
+   circle is the answer key. Put the native control back for these two. */
+.optrow input[type="radio"], .qform .check input[type="checkbox"] {
+  appearance: auto; -webkit-appearance: auto;
+}
+.optrow input[type="radio"] {
+  width: 18px; height: 18px; flex: none; margin: 0; accent-color: var(--accent);
+}
+.optrow .optletter { flex: none; width: 16px; color: var(--dim); font-size: 12px; }
+.optrow input[type="text"] { flex: 1; min-width: 0; }
+.optrow.off { opacity: 0.35; }
+.optkey {
+  font-size: 11px; letter-spacing: 1.5px; color: var(--dim); margin-bottom: 6px;
+}
+.qform .err { min-height: 0; }
+.qform .btnrow { margin-bottom: 0; }
+
+/* ------------------------------------------------------------- preview */
+.previewbox { margin-top: 0; }
+.previewbox .ltable td { font-size: 12px; }
+.pvhead { margin-bottom: 6px; }
+.errlist li { margin-bottom: 4px; line-height: 1.4; }
+.errlist li b { color: #ff6b8a; font-weight: 400; }
+
+/* ------------------------------------------------------------- confirm box */
+.askveil {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+  padding: 20px; background: rgba(4, 6, 14, 0.82);
+}
+.askcard {
+  width: min(460px, 92vw); padding: 20px 22px;
+  background: var(--panel); border: 1px solid #ff6b8a; border-radius: 12px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+}
+.asktitle { font-size: 15px; letter-spacing: 1px; margin-bottom: 8px; }
+.askdetail { font-size: 13px; color: var(--dim); line-height: 1.5; }
+.askcard .btnrow { margin-bottom: 0; }

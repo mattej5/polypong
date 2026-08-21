@@ -18,6 +18,24 @@
     <div id="seats" class="seats"></div>
     <div id="empty" class="empty">Waiting for students to join…</div>
 
+    <!-- Opt-in seat for whoever is sitting at this machine. Ignore it and this
+         page stays exactly what it was: a projector view. -->
+    <div id="selfjoin" class="selfjoin">
+      <div class="joinlabel">OR PLAY FROM THIS SCREEN</div>
+      <div class="row">
+        <div class="field">
+          <label>YOUR NAME</label>
+          <input id="selfname" maxlength="14" autocomplete="off" placeholder="e.g. Mr J" />
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button id="selfgo" class="mini tall">TAKE A SEAT</button>
+        </div>
+      </div>
+      <div class="empty">steer with ← / → or A / D, answer questions with 1–4</div>
+      <div id="selferr" class="err"></div>
+    </div>
+
     <div class="row">
       <div class="field">
         <label>FILL WITH BOTS</label>
@@ -36,6 +54,27 @@
   <button id="pause" class="mini">PAUSE</button>
   <button id="reset" class="mini">END GAME</button>
   <span id="conn" class="conn">connected</span>
+
+  <!-- Only ever visible to someone who claimed a seat on this screen. -->
+  <span id="selfchip" class="selfchip hidden">
+    <span class="dot" id="selfdot"></span>
+    <span class="padname" id="selfwho"></span>
+    <span class="padlives" id="selflives"></span>
+    <span class="conn" id="selfhint"></span>
+    <button id="selfdrop" class="mini drop">DROP IT</button>
+  </span>
+</div>
+
+<!-- End of match. The arena used to go quiet here, which reads as a crash to a
+     room full of students. The primary button is a one-click rematch on the
+     same roster: nobody re-joins, nobody loses their seat. -->
+<div id="over" class="overlay over hidden" aria-live="polite">
+  <div class="panel">
+    <div class="overwho" id="overwho"></div>
+    <div class="oversub" id="oversub"></div>
+    <button id="overagain">PLAY AGAIN</button>
+    <button id="overlobby" class="mini wide">BACK TO LOBBY</button>
+  </div>
 </div>
 
 <!-- Projected question. DOM, not canvas — render.js is owned elsewhere, and
@@ -48,6 +87,8 @@
     <ol class="wallopts" id="wallopts"></ol>
     <div class="wallcount" id="wallcount"></div>
     <div class="wallrows" id="wallrows"></div>
+    <!-- Only this screen's own seat, never the class. -->
+    <div class="wallmine" id="wallmine"></div>
   </div>
 </div>
 

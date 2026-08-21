@@ -2,6 +2,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>POLYPONG — Teacher Console</title>
 <link rel="stylesheet" href="./src/shell.css" />
+<link rel="stylesheet" href="./src/admin.css" />
 
 <div class="admin">
   <header class="adminbar">
@@ -78,27 +79,67 @@
         <input id="setname" maxlength="60" placeholder="e.g. Waves quiz — period 3" />
       </div>
 
-      <div class="field">
-        <label for="csv">PASTE CSV — <code>question,a,b,c,d,correct,topic</code></label>
-        <textarea id="csv" rows="9" spellcheck="false"
-          placeholder="Which organelle releases energy?,Ribosome,Mitochondrion,Golgi body,Vacuole,B,cells
-A force can change motion.,True,False,,,A,forces"></textarea>
+      <!-- ------------------------------------------------------- import -->
+      <div class="importbar">
+        <button id="pickfile" class="mini">CHOOSE A FILE…</button>
+        <input id="fileinput" type="file" class="hidden"
+               accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" />
+        <span class="dim small">
+          …or drag the file anywhere onto this page.
+          CSV or TSV, straight out of Google Sheets or Excel.
+        </span>
       </div>
-      <p class="dim small">
-        <code>correct</code> is a letter A–D. <code>topic</code> is optional.
-        Leave <strong>both</strong> c and d blank for a two-option question.
-        A header row is fine — it is ignored.
-      </p>
+      <div id="filenote" class="filenote small"></div>
+
+      <div class="editsplit">
+        <div class="editcol">
+
+          <div class="tabs" role="tablist" aria-label="How to build this set">
+            <button id="tab-form" class="mini tab on" role="tab"
+                    aria-selected="true" aria-controls="pane-form">WRITE BY HAND</button>
+            <button id="tab-csv" class="mini tab" role="tab"
+                    aria-selected="false" aria-controls="pane-csv">CSV TEXT</button>
+          </div>
+
+          <!-- ------------------------------------------------ by hand -->
+          <div id="pane-form" class="pane" role="tabpanel" aria-labelledby="tab-form">
+            <div id="qlist" class="qlist"></div>
+            <div class="btnrow">
+              <button id="addq" class="mini">+ ADD A QUESTION</button>
+            </div>
+          </div>
+
+          <!-- --------------------------------------------------- csv -->
+          <div id="pane-csv" class="pane hidden" role="tabpanel" aria-labelledby="tab-csv">
+            <div class="field">
+              <label for="csv">CSV — <code>question,a,b,c,d,correct,topic</code></label>
+              <textarea id="csv" rows="10" spellcheck="false"
+                placeholder="Which organelle releases energy?,Ribosome,Mitochondrion,Golgi body,Vacuole,B,cells
+A force can change motion.,True,False,,,A,forces"></textarea>
+            </div>
+            <p class="dim small">
+              <code>correct</code> is a letter A–D. <code>topic</code> is optional.
+              Leave <strong>both</strong> c and d blank for a two-option question.
+              A header row is fine — it is ignored. Tabs work instead of commas.
+            </p>
+            <div class="btnrow">
+              <button id="usecsv" class="mini">USE THIS CSV</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="editcol">
+          <div id="saveerr" class="err"></div>
+          <div id="previewbox" class="previewbox"></div>
+        </div>
+      </div>
 
       <div class="btnrow">
-        <button id="preview" class="mini">PREVIEW</button>
         <button id="save" class="mini">SAVE SET</button>
-        <button id="loadsample" class="mini">LOAD A SAMPLE INTO THE BOX</button>
-        <button id="clearedit" class="mini">NEW / CLEAR</button>
+        <button id="export" class="mini">EXPORT AS CSV</button>
+        <button id="loadsample" class="mini">COPY A SAVED SET</button>
+        <button id="clearedit" class="mini danger">NEW / CLEAR</button>
       </div>
-      <div id="saveerr" class="err"></div>
-
-      <div id="previewbox" class="previewbox"></div>
     </section>
 
     <!-- ------------------------------------------------------------- log -->
@@ -107,6 +148,13 @@ A force can change motion.,True,False,,,A,forces"></textarea>
       <div id="logbox" class="dim small">Nothing asked yet.</div>
     </section>
 
+  </div>
+</div>
+
+<div id="dropveil" class="dropveil hidden" aria-hidden="true">
+  <div class="dropcard">
+    DROP TO IMPORT
+    <small>a CSV or TSV file of questions</small>
   </div>
 </div>
 

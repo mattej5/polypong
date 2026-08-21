@@ -24,13 +24,21 @@ const QUIZ_PUSH_INTERVAL = 0.25;
  * decide whether that means fs.writeFile or storage.put.
  */
 export class Room {
-  constructor({ send, broadcast, snapHz = 20, meta = {}, sets = [], persistSets = null, rand = Math.random }) {
+  // 30Hz, not 20. Clients interpolate, so the rate is not what buys smoothness —
+  // but interpolation between two samples cuts the corner off a bounce that
+  // happened between them, and that error is proportional to the interval. A
+  // snapshot is ~500 bytes, so 30Hz to 8 clients is ~120KB/s on a LAN.
+  constructor({ send, broadcast, snapHz = 30, meta = {}, sets = [], persistSets = null, rand = Math.random }) {
     this.send = send;
     this.broadcast = broadcast;
     this.meta = meta;   // adapter-supplied, e.g. the join URL for this runtime
     this.snapInterval = 1 / snapHz;
     this.snapAcc = 0;
     this.rand = rand;
+    // Simulation clock: the sum of every dt this room has been ticked with. It
+    // stamps outgoing snapshots so clients can interpolate on the server's own
+    // timeline. Deliberately not Date.now — this class still owns no runtime API.
+    this.clock = 0;
 
     this.conns = new Map();   // connId -> { role, slot, token }
     this.seats = [];          // index = slot
@@ -164,6 +172,7 @@ export class Room {
         this.pushLobby();
         break;
       case C.START: this.startGame(); break;
+      case C.REMATCH: this.rematch(); break;
       case C.PAUSE:
         this.teacherPause = !!msg.on;
         if (!this.quiz.open) this.game.paused = this.teacherPause;
@@ -328,6 +337,25 @@ export class Room {
     this.seenElims = 0;
     this.lastTargetedRound = {};
     this.pushLobby();
+  }
+
+  /**
+   * Straight into another match on the same roster: same students, same seats,
+   * same bot count, no rejoining. This is the path a teacher takes between
+   * matches; resetToLobby is the slower one they take to change the roster.
+   *
+   * Everything that must not bleed from one match into the next is cleared
+   * here or inside Game.start(): hazards, the splitter, pending placements, the
+   * serve-target nomination, the winner, and any question left open. The revive
+   * budget is reset by startGame(), which matters more than it looks — inherit
+   * match one's spent budget and eliminated students would silently lose their
+   * way back into match two.
+   */
+  rematch() {
+    if (this.quiz.open) this.closeQuestion('rematch');
+    this.teacherPause = false;
+    this.game.paused = false;
+    this.startGame();
   }
 
   resetToLobby() {
@@ -549,6 +577,8 @@ export class Room {
 
   /** Driven by the adapter: setInterval under Node, alarms under a Durable Object. */
   tick(dt) {
+    this.clock += dt;
+
     if (this.quiz.open) {
       if (this.quiz.tick(dt) === 'done') this.closeQuestion('timer');
     }
@@ -564,7 +594,7 @@ export class Room {
     this.snapAcc += dt;
     if (this.snapAcc >= this.snapInterval) {
       this.snapAcc = 0;
-      this.broadcast({ t: S.SNAP, s: this.game.snapshot() });
+      this.broadcast({ t: S.SNAP, s: this.game.snapshot(), c: +this.clock.toFixed(4) });
     }
   }
 }
