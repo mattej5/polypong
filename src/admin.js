@@ -5,6 +5,7 @@ import { LETTERS, buildQuestion, parseQuestionCsv, questionsToCsv } from './quiz
 
 const $ = (id) => document.getElementById(id);
 const el = {
+  template: $('template'),
   conn: $('conn'), live: $('livebox'), table: $('livetable'),
   askNow: $('asknow'), closeNow: $('closenow'),
   cfgSet: $('cfgset'), cfgTimer: $('cfgtimer'), cfgEnabled: $('cfgenabled'),
@@ -787,3 +788,43 @@ function onLog(msg) {
 render();
 note('Choose a file, drag one onto the page, add a question by hand, or paste CSV.');
 connect();
+
+// ---------------------------------------------------------------- template
+// A starter file for a teacher who has never seen this format. Built through
+// questionsToCsv so the columns can never drift from what the parser expects,
+// and carrying one four-option and one two-option example because the
+// two-option form is the accessibility path and is not guessable from a header.
+const TEMPLATE_QUESTIONS = [
+  {
+    q: 'Which organelle releases energy from food?',
+    options: ['Nucleus', 'Mitochondria', 'Ribosome', 'Golgi body'],
+    correct: 1,
+    topic: 'cells',
+  },
+  {
+    q: 'Delete these two rows and type your own. Leave c and d blank for a two-option question.',
+    options: ['True', 'False', '', ''],
+    correct: 0,
+    topic: 'example',
+  },
+];
+
+function downloadCsv(text, filename) {
+  // Leading BOM so Excel opens accented characters correctly.
+  const blob = new Blob(['\ufeff' + text + '\n'], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+if (el.template) {
+  el.template.addEventListener('click', () => {
+    downloadCsv(questionsToCsv(TEMPLATE_QUESTIONS), 'polypong-question-template.csv');
+    note('Template saved to your Downloads folder. Fill it in, then choose the file or drag it here.', 'ok');
+  });
+}
