@@ -23,7 +23,9 @@ canvas { display: block; }
 .panel.wide { width: min(780px, 94vw); }
 h1 { margin: 0; font-size: 40px; letter-spacing: 6px; }
 h1 span { color: var(--accent); }
-.tag { margin: 6px 0 18px; color: var(--dim); font-size: 13px; letter-spacing: 1px; }
+/* The strapline under the wordmark used to hold this gap open. Scoped to
+   .panel so the teacher console's own h1 keeps its baseline alignment. */
+.panel h1 { margin-bottom: 18px; }
 
 .joinbox { border: 1px dashed var(--line); border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; }
 .joinlabel { font-size: 11px; letter-spacing: 2px; color: var(--dim); }
@@ -95,7 +97,6 @@ button:disabled { opacity: 0.45; cursor: default; filter: none; }
   font-size: 11px; letter-spacing: 2px; color: var(--dim); margin-bottom: 10px;
 }
 .qtimer { font-weight: 700; color: var(--accent); letter-spacing: 1px; }
-.qtimer.over { color: #ffd24d; }
 .qtext {
   margin: 0 0 16px; font-size: clamp(19px, 3.4vw, 26px); line-height: 1.32;
   letter-spacing: 0; user-select: text;
@@ -119,7 +120,6 @@ button:disabled { opacity: 0.45; cursor: default; filter: none; }
 .qopt.picked { border-color: var(--accent); background: rgba(77,210,255,0.18); }
 .qopt.right { border-color: #7cff4d; background: rgba(124,255,77,0.16); }
 .qopt.wrong { border-color: #ff4d6d; background: rgba(255,77,109,0.16); }
-.qstatus { margin: 14px 0 0; font-size: 14px; color: var(--dim); min-height: 20px; }
 
 /* --------------------------------------------------------- projected quiz */
 .quizwall {
@@ -130,7 +130,6 @@ button:disabled { opacity: 0.45; cursor: default; filter: none; }
   width: min(1200px, 94vw); background: var(--panel); border: 1px solid var(--line);
   border-radius: 18px; padding: 3vh 4vw;
 }
-.quizwall .qwhy { font-size: 13px; letter-spacing: 4px; color: var(--dim); }
 .walltext { margin: 10px 0 20px; font-size: clamp(26px, 4.2vw, 58px); line-height: 1.2; }
 .wallopts {
   list-style: none; margin: 0; padding: 0;
@@ -214,7 +213,6 @@ textarea {
 .selfchip .drop { display: none; }
 .selfchip .drop.show { display: block; }
 
-.wallmine { margin-top: 10px; font-size: clamp(14px, 1.5vw, 20px); color: var(--accent); min-height: 22px; }
 .wallopts.pickable li { cursor: pointer; }
 .wallopts.pickable li:hover { border-color: var(--accent); }
 .wallopts li.picked { border-color: var(--accent); background: rgba(77,210,255,0.16); }
@@ -225,7 +223,6 @@ textarea {
   font-size: clamp(34px, 6.5vw, 76px); font-weight: 800; letter-spacing: 4px;
   line-height: 1.1; word-break: break-word;
 }
-.oversub { margin: 10px 0 22px; color: var(--dim); font-size: 13px; letter-spacing: 1px; }
 .over .mini.wide { width: 100%; margin-top: 10px; }
 
 /* The student pad's version: no controls, just who won. `.hidden` carries
@@ -236,7 +233,6 @@ textarea {
 }
 .overcard { text-align: center; width: min(92vw, 520px); }
 .overcard .overwho { font-size: clamp(30px, 8.5vw, 56px); letter-spacing: 2px; }
-.overcard .oversub { margin: 12px auto 0; max-width: 34ch; }
 
 /* Checkboxes and radios opt out of the blanket `appearance: none` above, which
    erased their checked state entirely — a teacher could not see whether

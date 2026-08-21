@@ -3,7 +3,7 @@ import { render } from './render.js';
 import { C, S, decode, encode } from './net/protocol.js';
 import { SnapshotStream } from './net/interp.js';
 import { PaddlePredictor } from './net/predict.js';
-import { T, COLORS, KEY_LABELS } from './config.js';
+import { T, COLORS } from './config.js';
 import { LETTERS } from './quiz.js';
 
 const canvas = document.getElementById('stage');
@@ -105,7 +105,6 @@ const selfChip = document.getElementById('selfchip');
 const selfDot = document.getElementById('selfdot');
 const selfWho = document.getElementById('selfwho');
 const selfLives = document.getElementById('selflives');
-const selfHint = document.getElementById('selfhint');
 const selfDrop = document.getElementById('selfdrop');
 
 const seated = () => seat.slot !== null;
@@ -146,13 +145,9 @@ function seatHandle(msg) {
     selfDot.style.background = seat.color;
     selfWho.textContent = seat.name;
     selfLives.style.color = seat.color;
-    selfHint.textContent = `${KEY_LABELS[1]} or A / D`;
     selfChip.classList.remove('hidden');
     return;
   }
-  // Personal question result. The wall itself stays impersonal — who answered
-  // what belongs on the teacher's screen, not on the projector.
-  if (msg.t === S.QUIZ_END) return wallOwnResult(msg);
 }
 
 function claimSeat() {
@@ -236,12 +231,10 @@ selfDrop.addEventListener('click', () => seatSend({ t: C.PLACE }));
 // reaches the projector if the teacher explicitly switches it on.
 
 const wall = document.getElementById('quizwall');
-const wallWhy = document.getElementById('wallwhy');
 const wallText = document.getElementById('walltext');
 const wallOpts = document.getElementById('wallopts');
 const wallCount = document.getElementById('wallcount');
 const wallRows = document.getElementById('wallrows');
-const wallMine = document.getElementById('wallmine');
 let wallQid = null;
 let wallOptCount = 0;
 let wallLocked = false;
@@ -251,7 +244,6 @@ function answer(i) {
   if (!seated() || wallQid === null || wallLocked) return;
   wallLocked = true;
   [...wallOpts.children].forEach((li, j) => li.classList.toggle('picked', j === i));
-  wallMine.textContent = `You locked in ${LETTERS[i]}.`;
   seatSend({ t: C.ANSWER, qid: wallQid, c: i });
 }
 
@@ -261,8 +253,6 @@ function wallAsk(msg) {
   wallOptCount = msg.options.length;
   wallLocked = false;
   setDir(0);                        // never keep drifting while a question is up
-  wallWhy.textContent = msg.reason === 'elimination' ? 'AFTER AN ELIMINATION'
-    : msg.reason === 'volley' ? 'AFTER 3 VOLLEYS' : 'QUESTION';
   wallText.textContent = msg.q;
   wallOpts.innerHTML = '';
   wallOpts.classList.toggle('two', msg.options.length === 2);
@@ -277,21 +267,21 @@ function wallAsk(msg) {
   });
   wallCount.textContent = '0 answered';
   wallRows.textContent = '';
-  wallMine.textContent = seated() ? `Press 1–${msg.options.length} to answer.` : '';
   wall.classList.remove('hidden');
 }
 
 function wallTick(msg) {
   if (msg.qid !== wallQid) return;
-  wallCount.textContent = `${msg.answered} of ${msg.total} answered` +
-    (msg.overtime ? ' — still thinking' : '');
+  wallCount.textContent = `${msg.answered} of ${msg.total} answered`;
 }
 
 function wallEnd(msg) {
   if (msg.qid !== wallQid) { wallHide(); return; }
   wallLocked = true;
+  // The right option lights up green; naming it again underneath is the same
+  // fact twice.
   [...wallOpts.children].forEach((li, i) => li.classList.toggle('right', i === msg.correct));
-  wallCount.textContent = `Answer: ${LETTERS[msg.correct]}. ${msg.options[msg.correct]}`;
+  wallCount.textContent = '';
   // msg.rows only arrives when the teacher has opted in to projecting results.
   wallRows.textContent = Array.isArray(msg.rows)
     ? msg.rows.map((r) => `${r.name} ${r.choice === null ? '—' : r.correct ? '✓' : '✗'}`).join('   ')
@@ -299,20 +289,10 @@ function wallEnd(msg) {
   wallHideTimer = setTimeout(wallHide, 4500);
 }
 
-/** The seat connection's own copy of the result, which knows how it did. */
-function wallOwnResult(msg) {
-  if (msg.qid !== wallQid) return;
-  wallMine.textContent = msg.youWere === 'right'
-    ? (msg.revived ? 'Correct — you are back in the game!' : 'Correct.')
-    : msg.youWere === 'missed' ? 'You ran out of time.'
-    : msg.youWere === 'wrong' ? 'Not this time.' : '';
-}
-
 function wallHide() {
   if (wallHideTimer) { clearTimeout(wallHideTimer); wallHideTimer = null; }
   wallQid = null;
   wallLocked = false;
-  wallMine.textContent = '';
   wall.classList.add('hidden');
 }
 
@@ -376,7 +356,6 @@ document.getElementById('pause').addEventListener('click', (e) => {
 
 const overEl = document.getElementById('over');
 const overWho = document.getElementById('overwho');
-const overSub = document.getElementById('oversub');
 
 document.getElementById('overagain').addEventListener('click', () => {
   setErr('');
@@ -386,11 +365,8 @@ document.getElementById('overlobby').addEventListener('click', () => sendMsg({ t
 
 function showVictory() {
   const w = game.winner;
-  overWho.textContent = w ? `${w.name} WINS` : 'GAME OVER';
+  overWho.textContent = w ? `${w.name} WINS!` : 'GAME OVER';
   overWho.style.color = w ? (w.color || COLORS[w.idx]) : '#ffffff';
-  overSub.textContent = w
-    ? 'everyone keeps their seat — one click starts the next match'
-    : 'no winner — everyone keeps their seat';
 }
 
 // ---------------------------------------------------------------------- view
@@ -435,11 +411,8 @@ function refreshSeatHud() {
     s.className = 'pip' + (p && i < p.lives ? ' on' : '');
     selfLives.appendChild(s);
   }
-  const mine = myPlacement();
-  selfDrop.classList.toggle('show', mine);
-  selfHint.textContent = mine ? 'click the arena, then DROP'
-    : p && !p.alive ? 'out — answer to get back in'
-    : '← / → or A / D';
+  // The DROP button appearing is the whole prompt. Life pips carry the rest.
+  selfDrop.classList.toggle('show', myPlacement());
 }
 
 let last = performance.now();

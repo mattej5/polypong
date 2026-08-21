@@ -347,11 +347,16 @@ function drawHud(ctx, game) {
       }
     }
 
-    ctx.globalAlpha = 0.55;
-    ctx.fillStyle = p.color;
-    ctx.font = `500 ${size * 0.6}px ${MONO}`;
-    ctx.fillText(p.keyLabel, out.x, out.y + size * 1.35);
-    ctx.globalAlpha = 1;
+    // Key labels only on the offline hotseat, where eight people share one
+    // keyboard and "A / D" under a name is a seating chart, not an instruction.
+    // Every networked player has their own device; there is nothing to map.
+    if (!game.replica) {
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = p.color;
+      ctx.font = `500 ${size * 0.6}px ${MONO}`;
+      ctx.fillText(p.keyLabel, out.x, out.y + size * 1.35);
+      ctx.globalAlpha = 1;
+    }
   }
   ctx.restore();
 }
@@ -362,37 +367,24 @@ function drawBanner(ctx, game) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
+  // The count is the whole banner. `game.banner` carries prose set in game.js
+  // ("GET READY", "5-PLAYER ARENA") and is deliberately not drawn: the number
+  // says wait, and the arena you are about to play in is already on screen.
   if (game.state === STATE.COUNTDOWN) {
     ctx.fillStyle = 'rgba(255,255,255,0.92)';
     ctx.font = `800 ${R * 0.34}px ${MONO}`;
     ctx.fillText(String(Math.ceil(game.timer)), w / 2, h / 2);
-    if (game.banner) {
-      ctx.fillStyle = HUD_DIM;
-      ctx.font = `700 ${R * 0.07}px ${MONO}`;
-      ctx.fillText(game.banner, w / 2, h / 2 + R * 0.26);
-    }
   }
 
+  // Who is out, and nothing else. What a hazard does is learned by watching one
+  // pull a ball; how to place it is the ghost under the cursor and the DROP
+  // button that appears on the placer's own device.
   if (game.state === STATE.PLACEMENT) {
     const job = game.pending[0];
     if (job) {
-      const label = job.kind === 'sun' ? 'SUN' : 'BLACK HOLE';
       ctx.fillStyle = job.player.color;
       ctx.font = `800 ${R * 0.085}px ${MONO}`;
       ctx.fillText(`${job.player.name} ELIMINATED`, w / 2, h * 0.085);
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.font = `600 ${R * 0.055}px ${MONO}`;
-      ctx.fillText(`CLICK TO PLACE YOUR ${label}`, w / 2, h * 0.085 + R * 0.10);
-      ctx.fillStyle = HUD_DIM;
-      ctx.globalAlpha = 0.75;
-      ctx.font = `500 ${R * 0.04}px ${MONO}`;
-      ctx.fillText(
-        job.kind === 'sun'
-          ? 'repels the ball, superheats it — a hot goal costs 2 lives'
-          : 'pulls the ball in when it drifts close',
-        w / 2, h * 0.085 + R * 0.175
-      );
-      ctx.globalAlpha = 1;
     }
   }
 

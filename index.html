@@ -30,9 +30,8 @@
     padding: 26px 28px 24px;
     box-shadow: 0 24px 70px rgba(0,0,0,0.6);
   }
-  h1 { margin: 0; font-size: 40px; letter-spacing: 6px; }
+  h1 { margin: 0 0 20px; font-size: 40px; letter-spacing: 6px; }
   h1 span { color: var(--accent); }
-  .tag { margin: 6px 0 20px; color: var(--dim); font-size: 13px; letter-spacing: 1px; }
 
   .row { display: flex; gap: 14px; margin-bottom: 14px; }
   .field { flex: 1; }
@@ -58,13 +57,12 @@
   .who { flex: 1; color: var(--text); }
   .keys { color: var(--dim); }
 
-  .rules { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px;
-           font-size: 11.5px; line-height: 1.75; color: var(--dim); }
-  .rules b { color: var(--text); font-weight: 600; }
-
   #over .panel { text-align: center; }
-  #over-title { font-size: 44px; letter-spacing: 5px; margin: 0 0 8px; }
-  #over-sub { color: var(--dim); font-size: 13px; margin-bottom: 20px; }
+  #over-title { font-size: 44px; letter-spacing: 5px; margin: 0 0 20px; }
+  /* src/main.js still writes a round/hazard tally in here. That file is owned
+     elsewhere right now, so the line is suppressed rather than deleted; drop
+     the element and the write together when main.js is free. */
+  #over-sub { display: none; }
 </style>
 
 <canvas id="stage"></canvas>
@@ -72,7 +70,6 @@
 <div id="menu" class="overlay">
   <div class="panel">
     <h1>POLY<span>PONG</span></h1>
-    <div class="tag">up to 8 players · one keyboard · shrinking arena</div>
 
     <div class="row">
       <div class="field">
@@ -91,15 +88,6 @@
 
     <div id="legend"></div>
     <button id="start">START</button>
-
-    <div class="rules">
-      <b>3 lives each.</b> Get scored on three times and you are out.<br />
-      <b>Arena reshapes</b> as players die: octagon → … → triangle → classic pong.<br />
-      <b>When you are out</b> you click to drop a <b>black hole</b> into the next arena — it drags the ball in.<br />
-      <b>Every 3rd elimination</b> drops a <b>sun</b> instead: it shoves the ball away and superheats it. A hot ball costs the next victim <b>2 lives</b>.<br />
-      <b>Green dot</b> appears every few rounds — hit it and the ball splits into three.<br />
-      <b>P</b> or <b>Esc</b> pauses.
-    </div>
   </div>
 </div>
 

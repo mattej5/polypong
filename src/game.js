@@ -11,6 +11,14 @@ export const STATE = {
   GAMEOVER: 'gameover',
 };
 
+// Placement deadlines, in seconds. EVERY pending job runs one, bot or student.
+// A match that waits forever on somebody who has closed their Chromebook is a
+// deadlock, not patience: the hazard drop is the only thing that can move the
+// state machine out of PLACEMENT, so nothing else can ever advance either.
+// A student gets a long window and their own aim is honoured if they set one.
+const PLACE_WAIT_BOT = 1.1;
+const PLACE_WAIT_HUMAN = 12;
+
 export class Game {
   constructor() {
     this.state = STATE.MENU;
@@ -29,7 +37,14 @@ export class Game {
     this.serveTarget = null;   // player idx the next serve is aimed at, or null
     this.servedAt = null;      // who the live serve was actually aimed at
     this.pending = [];
+    // `paused` means exactly one thing: the ball is stopped. See update().
     this.paused = false;
+    // Set by the driver while the eliminated student is looking at something
+    // other than the arena (an open quiz question). It holds their placement
+    // deadline only — it can never hold a bot, and whoever sets it is
+    // responsible for clearing it in bounded time.
+    this.placeHold = false;
+    this.countdownServes = true;
     this.winner = null;
     this.banner = '';
     this.viewport = { w: 800, h: 600, cx: 400, cy: 300, R: 260, dpr: 1 };
@@ -101,6 +116,8 @@ export class Game {
     this.serveTimer = 0;   // a rematch must not inherit the last match's clock
     this.winner = null;
     this.paused = false;
+    this.placeHold = false;
+    this.countdownServes = true;
     this.aim = null;
     this.placeRequested = false;
     this.rebuildArena();
@@ -148,10 +165,40 @@ export class Game {
     }
   }
 
-  beginCountdown(text) {
+  /**
+   * Two different countdowns share this state, and `serveOnEnd` is the only
+   * thing that separates them. The match-start / new-arena countdown ends by
+   * serving a fresh ball. The resume countdown after a question ends by simply
+   * letting the ball already on the table move again.
+   *
+   * Generalised rather than given its own state on purpose: COUNTDOWN already
+   * means "the ball does not move, and a number is on screen", which is
+   * exactly a resume hold, and render.js draws that number on the arena screen
+   * AND on every student pad with no client change. A second state would have
+   * needed both to learn about it.
+   */
+  beginCountdown(text, seconds = T.countdown, serveOnEnd = true) {
     this.state = STATE.COUNTDOWN;
-    this.timer = T.countdown;
+    this.timer = seconds;
     this.banner = text || '';
+    this.countdownServes = serveOnEnd;
+  }
+
+  /**
+   * Give the class a beat to look up from a question and find the ball before
+   * it moves again. Freezes it exactly where it is — position and velocity are
+   * untouched — because re-serving from the centre would hand a free reset to
+   * whoever was about to concede, which changes the game instead of making it
+   * fair. Returns true if a hold was armed.
+   */
+  beginResume(seconds) {
+    if (!(seconds > 0)) return false;
+    // Only a live rally needs re-orienting. With no ball on the table a serve
+    // countdown is already on its way — the one after a hazard placement, say
+    // — and stacking a second countdown on it would just look broken.
+    if (this.state !== STATE.PLAYING || this.balls.length === 0) return false;
+    this.beginCountdown('', seconds, false);
+    return true;
   }
 
   serve() {
@@ -240,8 +287,18 @@ export class Game {
       return;
     }
     if (this.state === STATE.MENU || this.state === STATE.GAMEOVER) return;
-    if (this.paused) return;
 
+    // A pause stops the BALL, not the match's ability to make progress.
+    // Everything above the `paused` gate is either cosmetic decay or the
+    // placement state machine; everything below it moves or serves the ball.
+    //
+    // Placement sits above deliberately. It is the one phase whose exit
+    // depends on an actor rather than a clock, so freezing it is the one
+    // freeze that can become permanent: the quiz fires a question on every
+    // elimination, which is precisely the moment PLACEMENT begins, and with
+    // auto-advance off (the default) an unanswered question never closes.
+    // Pause and placement therefore collided on every elimination, and the
+    // match could never leave PLACEMENT.
     this.shake = Math.max(0, this.shake - dt * 4);
     this.updateParticles(dt);
 
@@ -250,6 +307,12 @@ export class Game {
       return;
     }
 
+    // COUNTDOWN and the serve timer stay below the gate on purpose: they only
+    // ever wait on their own clock, so a pause delays them but can never
+    // deadlock them, and letting them run would serve the ball into a class
+    // that is still reading a question.
+    if (this.paused) return;
+
     this.updatePaddles(dt);
 
     if (this.state === STATE.COUNTDOWN) {
@@ -257,7 +320,10 @@ export class Game {
       if (this.timer <= 0) {
         this.state = STATE.PLAYING;
         this.banner = '';
-        this.serve();
+        // A resume hold leaves the ball exactly where it was; only a fresh
+        // arena serves. See beginCountdown.
+        if (this.countdownServes) this.serve();
+        this.countdownServes = true;
       }
       return;
     }
@@ -474,7 +540,26 @@ export class Game {
     this.placeRequested = false;
   }
 
+  /** A hazard nobody can place blocks everybody. Drop jobs that went stale. */
+  dropStaleJobs() {
+    while (this.pending.length) {
+      const job = this.pending[0];
+      if (job && job.player && !job.player.alive) return;
+      this.pending.shift();
+      this.aim = null;
+      this.ghost = null;
+      this.placeRequested = false;
+    }
+  }
+
+  randomAim() {
+    const a = Math.random() * Math.PI * 2;
+    const d = 0.35 + Math.random() * 0.4;
+    return { u: Math.cos(a) * d, v: Math.sin(a) * d };
+  }
+
   updatePlacement(dt) {
+    this.dropStaleJobs();
     const job = this.pending[0];
     if (!job) {
       this.state = STATE.COUNTDOWN;
@@ -482,16 +567,25 @@ export class Game {
       return;
     }
 
-    // Bots aim for themselves after a beat, so an AI elimination never stalls the game.
-    if (job.player.isBot) {
-      job.wait = (job.wait ?? 1.1) - dt;
-      if (!this.aim || job.wait <= 0) {
-        const a = Math.random() * Math.PI * 2;
-        const d = 0.35 + Math.random() * 0.4;
-        this.aim = { u: Math.cos(a) * d, v: Math.sin(a) * d };
-      }
-      if (job.wait <= 0) this.placeRequested = true;
+    // Every job runs a deadline, bot or student. Bots aim for themselves after
+    // a beat; a student gets far longer and their own aim is used if they set
+    // one, but the clock always expires so the match cannot be held hostage by
+    // an eliminated player who never presses DROP.
+    const isBot = job.player.isBot;
+    if (job.wait === undefined) job.wait = isBot ? PLACE_WAIT_BOT : PLACE_WAIT_HUMAN;
+    // A student who dropped out mid-placement is now an AI; resolve at bot speed.
+    if (isBot && job.wait > PLACE_WAIT_BOT) job.wait = PLACE_WAIT_BOT;
+    // A student reading a question cannot reach the aim UI, so hold their clock
+    // while the driver says so. A bot has nothing to read and is never held.
+    if (isBot || !this.placeHold) job.wait -= dt;
+
+    if (isBot) {
+      if (!this.aim || job.wait <= 0) this.aim = this.randomAim();
+    } else if (job.wait <= 0 && !this.aim) {
+      // Timed out having never aimed: somewhere legal beats stalling the class.
+      this.aim = this.randomAim();
     }
+    if (job.wait <= 0) this.placeRequested = true;
 
     this.ghost = this.resolveAim();
 

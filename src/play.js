@@ -84,11 +84,9 @@ function handle(msg) {
 // answering is how they get back into the arena.
 
 const quizEl = document.getElementById('quiz');
-const qWhy = document.getElementById('qwhy');
 const qText = document.getElementById('qtext');
 const qOpts = document.getElementById('qopts');
 const qTimer = document.getElementById('qtimer');
-const qStatus = document.getElementById('qstatus');
 
 let quiz = null;          // { qid, options, locked }
 let hideTimer = null;
@@ -97,12 +95,8 @@ function quizAsk(msg) {
   if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
   quiz = { qid: msg.qid, options: msg.options, locked: false, choice: null };
 
-  qWhy.textContent = msg.reason === 'elimination' ? 'QUESTION — after an elimination'
-    : msg.reason === 'volley' ? 'QUESTION — after 3 volleys'
-    : 'QUESTION';
   qText.textContent = msg.q;
   qTimer.textContent = '';
-  qStatus.textContent = msg.twoOption ? 'Pick one of two answers.' : 'Pick one answer.';
 
   qOpts.innerHTML = '';
   qOpts.classList.toggle('two', msg.options.length === 2);
@@ -132,17 +126,16 @@ function choose(i) {
     b.classList.toggle('picked', j === i);
     b.disabled = true;
   });
-  qStatus.textContent = `Locked in ${LETTERS[i]}. Waiting for the rest of the class…`;
   sendMsg({ t: C.ANSWER, qid: quiz.qid, c: i });
 }
 
 function quizTick(msg) {
   if (!quiz || msg.qid !== quiz.qid) return;
-  qTimer.textContent = msg.overtime ? 'take your time' : `${msg.remaining}s`;
-  qTimer.classList.toggle('over', !!msg.overtime);
-  if (!quiz.locked) {
-    qStatus.textContent = `${msg.answered} of ${msg.total} answered — pick one answer.`;
-  }
+  // Past the clock the timer simply goes away. It used to say "take your time"
+  // and take an `over` class — which collided with the victory overlay's own
+  // `.over` rule and turned this span into a fullscreen sheet that swallowed
+  // every tap on the answer buttons.
+  qTimer.textContent = msg.overtime ? '' : `${msg.remaining}s`;
 }
 
 function quizEnd(msg) {
@@ -153,13 +146,9 @@ function quizEnd(msg) {
     b.classList.toggle('right', j === msg.correct);
     b.classList.toggle('wrong', j === quiz.choice && j !== msg.correct);
   });
+  // Green on the right answer, red on yours if it was not: the buttons already
+  // say everything the sentence underneath used to.
   qTimer.textContent = '';
-  const key = `${LETTERS[msg.correct]}. ${msg.options[msg.correct]}`;
-  qStatus.textContent =
-    msg.youWere === 'right' ? (msg.revived ? `Correct — you are back in the game!` : `Correct.`)
-    : msg.youWere === 'missed' ? `Time. The answer was ${key}.`
-    : `Not this time. The answer was ${key}.`;
-  if (msg.targeted) qStatus.textContent += ' Watch your wall on the next serve.';
   hideTimer = setTimeout(quizHide, 4000);
 }
 
@@ -185,18 +174,14 @@ addEventListener('keydown', (e) => {
 
 const overEl = document.getElementById('over');
 const overWho = document.getElementById('overwho');
-const overSub = document.getElementById('oversub');
 
 function refreshVictory() {
   const on = game.state === STATE.GAMEOVER;
   overEl.classList.toggle('hidden', !on);
   if (!on) return;
   const w = game.winner;
-  overWho.textContent = w ? `${w.name} WINS` : 'GAME OVER';
+  overWho.textContent = w ? `${w.name} WINS!` : 'GAME OVER';
   overWho.style.color = w ? (w.color || COLORS[w.idx]) : '#fff';
-  overSub.textContent = w && w.idx === me.slot
-    ? 'that was you — keep your seat, the next match starts on the arena screen'
-    : 'keep your seat — the next match starts on the arena screen';
 }
 
 // -------------------------------------------------------------------- status
@@ -212,23 +197,12 @@ function refreshStatus() {
     livesEl.appendChild(s);
   }
 
+  // The DROP button appearing is the prompt; the mini arena is the rest of it.
+  // `statusEl` is left for the one thing a player cannot see for themselves —
+  // the connection dropping — which connect() writes on close.
   const job = game.pending[0];
-  const mine = job && job.player && job.player.idx === me.slot;
-  dropBtn.classList.toggle('show', !!mine);
-
-  if (mine) {
-    statusEl.textContent = `you are out — tap the arena, then DROP IT to place your ${job.kind === 'sun' ? 'SUN' : 'BLACK HOLE'}`;
-  } else if (game.state === STATE.PLACEMENT) {
-    statusEl.textContent = `${job ? job.player.name : 'someone'} is placing a hazard…`;
-  } else if (game.state === STATE.MENU) {
-    statusEl.textContent = 'waiting for the teacher to start…';
-  } else if (game.state === STATE.GAMEOVER) {
-    statusEl.textContent = game.winner ? `${game.winner.name} wins!` : 'game over';
-  } else if (!p.alive) {
-    statusEl.textContent = 'you are out — watch for your next chance';
-  } else {
-    statusEl.textContent = '';
-  }
+  dropBtn.classList.toggle('show', !!(job && job.player && job.player.idx === me.slot));
+  statusEl.textContent = '';
 }
 
 // -------------------------------------------------------------------- inputs

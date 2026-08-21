@@ -18,6 +18,18 @@ export const QUIZ = {
   // Auto-advance OFF by default: a question never closes while a student is
   // still working unless the teacher flips this on or presses "close now".
   autoAdvanceDefault: false,
+  // TERMINATION. The arena freeze that comes with an open question is bounded,
+  // even though the question itself is not. Once every student's clock has run
+  // out this many seconds go by and then the ball resumes, while the question
+  // stays open for anyone still working. Without this an unanswered question --
+  // the normal case with autoAdvance off -- froze the match permanently.
+  freezeGraceSec: 20,
+  // FAIRNESS. When the arena comes back after a question the ball is frozen
+  // where it stands for this long, with the count on the arena screen and on
+  // every student pad, so nobody loses a life to a ball that moved while they
+  // were reading. Frozen in place, never re-served: a fresh serve from the
+  // centre would be a free reset for whoever was about to concede.
+  resumeCountdownSec: 3,
   // Live correct/incorrect goes to the teacher console only. The projector
   // shows the question and a bare answered-count until the teacher opts in.
   projectResultsDefault: false,

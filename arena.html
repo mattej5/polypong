@@ -8,7 +8,6 @@
 <div id="lobby" class="overlay">
   <div class="panel wide">
     <h1>POLY<span>PONG</span></h1>
-    <div class="tag">students join from any browser on this network</div>
 
     <div class="joinbox">
       <div class="joinlabel">JOIN AT</div>
@@ -16,7 +15,9 @@
     </div>
 
     <div id="seats" class="seats"></div>
-    <div id="empty" class="empty">Waiting for students to join…</div>
+    <!-- Kept as a spacer only: arena.js still toggles it, and an empty seat
+         grid already says that nobody has joined. -->
+    <div id="empty" class="empty"></div>
 
     <!-- Opt-in seat for whoever is sitting at this machine. Ignore it and this
          page stays exactly what it was: a projector view. -->
@@ -32,7 +33,6 @@
           <button id="selfgo" class="mini tall">TAKE A SEAT</button>
         </div>
       </div>
-      <div class="empty">steer with ← / → or A / D, answer questions with 1–4</div>
       <div id="selferr" class="err"></div>
     </div>
 
@@ -60,7 +60,6 @@
     <span class="dot" id="selfdot"></span>
     <span class="padname" id="selfwho"></span>
     <span class="padlives" id="selflives"></span>
-    <span class="conn" id="selfhint"></span>
     <button id="selfdrop" class="mini drop">DROP IT</button>
   </span>
 </div>
@@ -71,7 +70,6 @@
 <div id="over" class="overlay over hidden" aria-live="polite">
   <div class="panel">
     <div class="overwho" id="overwho"></div>
-    <div class="oversub" id="oversub"></div>
     <button id="overagain">PLAY AGAIN</button>
     <button id="overlobby" class="mini wide">BACK TO LOBBY</button>
   </div>
@@ -82,13 +80,10 @@
      Who answered what is NOT shown here unless the teacher opts in. -->
 <div id="quizwall" class="quizwall hidden" aria-live="polite">
   <div class="quizwallcard">
-    <div class="qwhy" id="wallwhy"></div>
     <div class="walltext" id="walltext"></div>
     <ol class="wallopts" id="wallopts"></ol>
     <div class="wallcount" id="wallcount"></div>
     <div class="wallrows" id="wallrows"></div>
-    <!-- Only this screen's own seat, never the class. -->
-    <div class="wallmine" id="wallmine"></div>
   </div>
 </div>
 

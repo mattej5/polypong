@@ -57,6 +57,10 @@ export class Room {
     this.quizEnabled = true;
     this.quizPushAcc = 0;
     this.teacherPause = false;
+    // Seconds the open question has spent with every deadline already passed.
+    // Bounds the arena freeze — see applyPause().
+    this.quizOvertimeAcc = 0;
+    this.quizFrozen = false;   // last computed freeze state; edge-detected
     this.seenVolleys = 0;
     this.seenElims = 0;
     this.lastTargetedRound = {};   // slot -> the round their wall was aimed at
@@ -175,7 +179,7 @@ export class Room {
       case C.REMATCH: this.rematch(); break;
       case C.PAUSE:
         this.teacherPause = !!msg.on;
-        if (!this.quiz.open) this.game.paused = this.teacherPause;
+        this.applyPause();
         break;
       case C.RESET: this.resetToLobby(); break;
     }
@@ -262,6 +266,7 @@ export class Room {
     const sec = msg.sec === undefined ? QUIZ.extensionStepSec : Number(msg.sec) || 0;
     if (sec === 0) this.quiz.clearExtension(slot);
     else this.quiz.extend(slot, sec);
+    this.applyPause();
     this.pushQuizCounters(true);
     this.broadcastSets();
   }
@@ -354,8 +359,8 @@ export class Room {
   rematch() {
     if (this.quiz.open) this.closeQuestion('rematch');
     this.teacherPause = false;
-    this.game.paused = false;
     this.startGame();
+    this.applyPause();
   }
 
   resetToLobby() {
@@ -366,6 +371,7 @@ export class Room {
     this.seenElims = 0;
     this.lastTargetedRound = {};
     this.teacherPause = false;
+    this.applyPause();
     this.pushLobby();
   }
 
@@ -417,9 +423,8 @@ export class Room {
 
     // Freeze the arena while the class thinks. Nothing auto-advances past a
     // student who is still working unless the teacher turned that on.
-    if (this.game.state !== STATE.MENU && this.game.state !== STATE.GAMEOVER) {
-      this.game.paused = true;
-    }
+    this.quizOvertimeAcc = 0;
+    this.applyPause();
     const payload = { t: S.QUIZ_ASK, ...this.quiz.askPayload() };
     this.broadcast(payload);
     this.pushQuizCounters(true);
@@ -438,7 +443,7 @@ export class Room {
     if (!this.quiz.open) return;
     const result = this.quiz.close();
     this.lastResult = { ...result, why };
-    this.game.paused = this.teacherPause;
+    this.applyPause();
 
     // A correct answer from an eliminated student buys them back into the
     // arena. This is the whole reason they answer at all.
@@ -521,17 +526,23 @@ export class Room {
   /** Cadence watchdog. Runs after the sim so the counters it reads are fresh. */
   detectTriggers() {
     const g = this.game;
-    if (this.quiz.open || !this.quizEnabled) return;
     if (g.state === STATE.MENU || g.state === STATE.GAMEOVER) return;
 
-    if (g.eliminations > this.seenElims) {
-      this.seenElims = g.eliminations;
-      if (QUIZ.askOnElimination && this.fireQuestion('elimination')) return;
-    }
-    if (g.volleys > this.seenVolleys) {
-      this.seenVolleys = g.volleys;
-      if (g.volleys % QUIZ.volleysPerQuestion === 0) this.fireQuestion('volley');
-    }
+    // Both counters are consumed even while a question is open. They used to
+    // be left unread, which meant a volley that completed before the question
+    // fired was still sitting there when it closed, and a second question
+    // opened in the same breath as the first one ended — re-freezing a
+    // placement that had only just been let go. A trigger the class has
+    // already sailed past is stale; it is not a question owed to them.
+    const elimDue = g.eliminations > this.seenElims;
+    const volleyDue = g.volleys > this.seenVolleys
+      && g.volleys % QUIZ.volleysPerQuestion === 0;
+    this.seenElims = g.eliminations;
+    this.seenVolleys = g.volleys;
+
+    if (this.quiz.open || !this.quizEnabled) return;
+    if (elimDue && QUIZ.askOnElimination && this.fireQuestion('elimination')) return;
+    if (volleyDue) this.fireQuestion('volley');
   }
 
   /** Per-connection quiz counters. Students see only their own clock. */
@@ -575,6 +586,49 @@ export class Room {
 
   // ------------------------------------------------------------------ clock
 
+  /**
+   * The only writer of `game.paused`. It is recomputed from scratch rather
+   * than toggled from four call sites, so no path can leave the arena stuck
+   * frozen — which is half of how the match used to deadlock.
+   *
+   * The freeze is deliberately BOUNDED. Auto-advance is off by default, so an
+   * unanswered question stays open indefinitely on purpose, and a class where
+   * nobody answers is the normal case, not an edge case. Letting that hold the
+   * ball forever is what turned a pause into a deadlock. So: the arena stays
+   * frozen while anyone still has time on their clock, then for a grace period
+   * after every deadline has passed, and then it resumes — while the question
+   * stays open for anyone still working, exactly as before. Granting an
+   * extension puts time back on a clock and re-freezes the arena.
+   */
+  applyPause(dt = 0) {
+    if (this.quiz.open && this.quiz.allDeadlinesPassed) this.quizOvertimeAcc += dt;
+    else this.quizOvertimeAcc = 0;
+
+    const frozen = this.quiz.open && this.quizOvertimeAcc < QUIZ.freezeGraceSec;
+
+    // Thawing edge. A class that was heads-down reading a question a moment
+    // ago should not find the ball already past their paddle, so the arena
+    // comes back through a short visible countdown with the ball frozen where
+    // it stands. One hook covers every way a freeze can end: the last student
+    // answered, the timer closed it, the teacher closed it, or the grace above
+    // ran out with the question still open.
+    if (this.quizFrozen && !frozen) this.game.beginResume(QUIZ.resumeCountdownSec);
+    this.quizFrozen = frozen;
+
+    this.game.paused = this.teacherPause || frozen;
+
+    // A student who cannot reach the aim UI must not lose their hazard to its
+    // timeout: hold their deadline while a question they have not answered is
+    // in front of them, or while the teacher has deliberately stopped the room.
+    // It holds a STUDENT's clock only. A bot has no choice worth protecting and
+    // is never held — that is what keeps this from becoming a stall again, and
+    // the quiz half of it is bounded by the freeze above regardless.
+    const job = this.game.pending[0];
+    const slot = job && job.player && !job.player.isBot ? job.player.idx : null;
+    this.game.placeHold = slot !== null
+      && (this.teacherPause || (frozen && !this.quiz.hasAnswered(slot)));
+  }
+
   /** Driven by the adapter: setInterval under Node, alarms under a Durable Object. */
   tick(dt) {
     this.clock += dt;
@@ -582,6 +636,7 @@ export class Room {
     if (this.quiz.open) {
       if (this.quiz.tick(dt) === 'done') this.closeQuestion('timer');
     }
+    this.applyPause(dt);
 
     this.game.update(dt);
     this.detectTriggers();

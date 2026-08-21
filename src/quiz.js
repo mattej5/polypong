@@ -341,6 +341,14 @@ export class QuizEngine {
     if (s && s.choice === null) c.seats.delete(slot);
   }
 
+  /** Has this student locked in an answer to the question that is open now? */
+  hasAnswered(slot) {
+    const c = this.current;
+    if (!c) return true;
+    const s = c.seats.get(slot);
+    return !s || s.choice !== null;
+  }
+
   get everyoneAnswered() {
     const c = this.current;
     if (!c) return false;
