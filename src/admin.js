@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
 const el = {
   template: $('template'),
   conn: $('conn'), live: $('livebox'), table: $('livetable'),
-  askNow: $('asknow'), closeNow: $('closenow'),
+  askNow: $('asknow'), closeNow: $('closenow'), endGame: $('endgame'),
   cfgSet: $('cfgset'), cfgTimer: $('cfgtimer'), cfgEnabled: $('cfgenabled'),
   cfgAuto: $('cfgauto'), cfgProject: $('cfgproject'), cfgNote: $('cfgnote'),
   setList: $('setlist'), setName: $('setname'), csv: $('csv'),
@@ -23,6 +23,8 @@ let sets = [];
 let cfg = {};
 let editingId = null;
 let openQid = null;
+let endingSession = false;   // true once END GAME is clicked — the socket close
+                              // that follows is expected, so stop reconnecting.
 
 // ------------------------------------------------------------------ transport
 
@@ -34,6 +36,7 @@ function connect() {
   });
   socket.addEventListener('message', (e) => handle(decode(e.data)));
   socket.addEventListener('close', () => {
+    if (endingSession) { el.conn.textContent = 'session ended'; return; }
     el.conn.textContent = 'reconnecting…';
     setTimeout(connect, 1000);
   });
@@ -686,6 +689,13 @@ async function editSet(s) {
 
 el.askNow.addEventListener('click', () => { el.saveErr.textContent = ''; sendMsg({ t: C.QUIZ_ASK_NOW }); });
 el.closeNow.addEventListener('click', () => sendMsg({ t: C.QUIZ_CLOSE }));
+
+el.endGame.addEventListener('click', () => {
+  if (!confirm('End the game and shut down the server? Every screen disconnects and nobody can rejoin until you start it again from this computer.')) return;
+  endingSession = true;
+  el.endGame.disabled = true;
+  sendMsg({ t: C.SHUTDOWN });
+});
 
 let current = null;
 

@@ -28,9 +28,15 @@ export class Room {
   // but interpolation between two samples cuts the corner off a bounce that
   // happened between them, and that error is proportional to the interval. A
   // snapshot is ~500 bytes, so 30Hz to 8 clients is ~120KB/s on a LAN.
-  constructor({ send, broadcast, snapHz = 30, meta = {}, sets = [], persistSets = null, rand = Math.random }) {
+  constructor({
+    send, broadcast, snapHz = 30, meta = {}, sets = [], cfg = {}, persistSets = null,
+    onShutdown = null, rand = Math.random,
+  }) {
     this.send = send;
     this.broadcast = broadcast;
+    // Adapter-supplied: closing sockets and exiting the process is transport
+    // work the Room itself must never do (see the class doc above).
+    this.onShutdown = typeof onShutdown === 'function' ? onShutdown : () => {};
     this.meta = meta;   // adapter-supplied, e.g. the join URL for this runtime
     this.snapInterval = 1 / snapHz;
     this.snapAcc = 0;
@@ -54,7 +60,13 @@ export class Room {
     this.nextSetNum = this.quiz.sets.reduce(
       (m, s) => Math.max(m, Number(String(s.id).replace(/\D/g, '')) || 0), 0) + 1;
 
-    this.quizEnabled = true;
+    // A teacher who turns questions off (or changes the timer/auto-advance)
+    // expects that to hold for the next class too, not just this one process —
+    // so these come from whatever the adapter last persisted, same as sets.
+    this.quizEnabled = cfg.enabled !== undefined ? !!cfg.enabled : true;
+    if (cfg.timerSec !== undefined) this.quiz.timerSec = cfg.timerSec;
+    if (cfg.autoAdvance !== undefined) this.quiz.autoAdvance = !!cfg.autoAdvance;
+    if (cfg.projectResults !== undefined) this.quiz.projectResults = !!cfg.projectResults;
     this.quizPushAcc = 0;
     this.teacherPause = false;
     // Seconds the open question has spent with every deadline already passed.
@@ -69,8 +81,8 @@ export class Room {
 
   // ------------------------------------------------------------ connections
 
-  join(connId) {
-    this.conns.set(connId, { role: null, slot: null, token: null });
+  join(connId, isLocal = false) {
+    this.conns.set(connId, { role: null, slot: null, token: null, isLocal });
   }
 
   leave(connId) {
@@ -101,6 +113,13 @@ export class Room {
   }
 
   hello(connId, c, msg) {
+    if (msg.role === 'teacher' && !c.isLocal) {
+      // Blocking /admin from loading is the visible half of this; a student
+      // who opens a raw socket from devtools and asks for role 'teacher'
+      // must still be refused here, or the page block does nothing.
+      this.send(connId, { t: S.ERROR, msg: 'The teacher console only works from this computer.' });
+      return;
+    }
     if (msg.role === 'display') c.role = 'display';
     else if (msg.role === 'teacher') c.role = 'teacher';
     else c.role = 'player';
@@ -194,8 +213,20 @@ export class Room {
       case C.QUIZ_ASK_NOW:  return this.askNow(connId);
       case C.QUIZ_CLOSE:    return this.closeQuestion('teacher');
       case C.QUIZ_EXTEND:   return this.extendFor(msg);
+      case C.SHUTDOWN:      return this.shutdown();
       default:              return this.displayMessage(msg);
     }
+  }
+
+  /**
+   * Teacher-initiated, full stop: not "back to lobby" but "end of class". Every
+   * screen gets told why before the sockets go, then the adapter tears down
+   * the actual server. Broadcast first — closing sockets before the message
+   * ships would leave every student staring at a silent disconnect.
+   */
+  shutdown() {
+    this.broadcast({ t: S.ERROR, msg: 'Session ended by the teacher.' });
+    this.onShutdown();
   }
 
   // ------------------------------------------------------------ question sets
@@ -231,7 +262,7 @@ export class Room {
       if (!this.quiz.activeSetId) this.quiz.setActiveSet(set.id);
     }
     if (this.quiz.activeSetId) this.quiz.reshuffle();
-    this.persistSets(this.quiz.sets);
+    this.persistAll();
     this.broadcastSets();
     if (errors.length) {
       this.send(connId, { t: S.ERROR, msg: `${errors.length} row(s) skipped — see the preview.` });
@@ -245,7 +276,7 @@ export class Room {
     if (this.quiz.activeSetId === msg.id) {
       this.quiz.setActiveSet(this.quiz.sets.length ? this.quiz.sets[0].id : null);
     }
-    this.persistSets(this.quiz.sets);
+    this.persistAll();
     this.broadcastSets();
   }
 
@@ -258,7 +289,17 @@ export class Room {
     if (msg.autoAdvance !== undefined) this.quiz.autoAdvance = !!msg.autoAdvance;
     if (msg.projectResults !== undefined) this.quiz.projectResults = !!msg.projectResults;
     if (msg.enabled !== undefined) this.quizEnabled = !!msg.enabled;
+    this.persistAll();
     this.broadcastSets();
+  }
+
+  /** Everything the adapter needs to bring this room back exactly as it was
+   * left: the question sets, and the settings around them (on/off, timer,
+   * auto-advance, whether results project). Without this, ending class with
+   * the new END GAME button and starting fresh next period would silently
+   * reset "questions off" back to on. */
+  persistAll() {
+    this.persistSets({ sets: this.quiz.sets, cfg: this.quizConfigPayload() });
   }
 
   extendFor(msg) {

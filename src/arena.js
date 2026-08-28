@@ -109,6 +109,12 @@ const selfDrop = document.getElementById('selfdrop');
 
 const seated = () => seat.slot !== null;
 
+// True from the moment "TAKE A SEAT" is clicked until the server confirms or
+// rejects the seat. Start must not fire while this is true, or a teacher who
+// clicks Start right after joining can start the match before their own
+// HELLO has round-tripped, leaving them off the roster with no player.
+let joinPending = false;
+
 function seatConnect(name) {
   seat.socket = new WebSocket(`ws://${location.host}`);
   seat.socket.addEventListener('open', () => {
@@ -133,8 +139,17 @@ const seatSend = (msg) => {
  */
 function seatHandle(msg) {
   if (!msg) return;
-  if (msg.t === S.ERROR) { selfErr.textContent = msg.msg; return; }
+  if (msg.t === S.ERROR) {
+    joinPending = false;
+    selfErr.textContent = msg.msg;
+    setErr(msg.msg);   // the lobby (and selfErr with it) hides the instant the
+                        // match starts, so the join failure needs a copy that
+                        // survives — the top-bar err strip does not get hidden.
+    if (lastLobbyMsg) onLobby(lastLobbyMsg);
+    return;
+  }
   if (msg.t === S.WELCOME && msg.role === 'player') {
+    joinPending = false;
     seat.slot = msg.slot;
     seat.name = msg.name;
     seat.color = msg.color;
@@ -146,6 +161,7 @@ function seatHandle(msg) {
     selfWho.textContent = seat.name;
     selfLives.style.color = seat.color;
     selfChip.classList.remove('hidden');
+    if (lastLobbyMsg) onLobby(lastLobbyMsg);
     return;
   }
 }
@@ -155,6 +171,8 @@ function claimSeat() {
   if (!name) { selfErr.textContent = 'Type a name first.'; return; }
   selfErr.textContent = '';
   seat.name = name;
+  joinPending = true;
+  startBtn.disabled = true;
   seatConnect(name);
 }
 selfGo.addEventListener('click', claimSeat);
@@ -313,7 +331,10 @@ const setConn = (m) => { connEl.textContent = m; };
 const joinEl = document.getElementById('joinurl');
 joinEl.textContent = `${location.host}/play`;
 
+let lastLobbyMsg = null;
+
 function onLobby(msg) {
+  lastLobbyMsg = msg;
   // The server knows its own LAN address; the address bar may just say localhost.
   if (msg.meta && msg.meta.joinUrl) joinEl.textContent = msg.meta.joinUrl;
   const seatCount = msg.seats.length;
@@ -336,7 +357,7 @@ function onLobby(msg) {
     botsSel.appendChild(o);
   }
   botsSel.value = String(keep);
-  startBtn.disabled = seatCount + keep < 2;
+  startBtn.disabled = seatCount + keep < 2 || joinPending;
 }
 
 botsSel.addEventListener('change', () => {

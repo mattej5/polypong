@@ -29,6 +29,9 @@ export const C = {
   QUIZ_ASK_NOW: 'qask', // {}                  fire a question immediately
   QUIZ_CLOSE: 'qclose', // {}                  teacher override: close early
   QUIZ_EXTEND: 'qext',  // { slot, sec }       per-student time extension
+  SHUTDOWN: 'shutdown', // {}                  teacher only -> ends the session
+                        // and stops the server process entirely, not just the
+                        // match. See Room.shutdown().
 };
 
 // server -> client

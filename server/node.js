@@ -33,8 +33,20 @@ const ROUTES = {
   '/solo': 'index.html',
 };
 
+// The teacher console runs the whole quiz + match control surface. A student
+// on the same Wi-Fi has no business loading it — it only ever needs to be
+// opened on the machine actually running this server.
+function isLoopback(addr) {
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+
 const http = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  if (url.pathname === '/admin' && !isLoopback(req.socket.remoteAddress)) {
+    res.writeHead(403, { 'content-type': 'text/plain' })
+      .end('The teacher console only works from this computer.');
+    return;
+  }
   const rel = ROUTES[url.pathname] || url.pathname.slice(1);
   const path = join(ROOT, normalize(rel));
   if (!path.startsWith(ROOT)) { res.writeHead(403).end('forbidden'); return; }
@@ -66,27 +78,32 @@ function seedSets() {
 async function loadSets() {
   try {
     const raw = JSON.parse(await readFile(SETS_FILE, 'utf8'));
+    // Old files are a bare array of sets with no config; new ones are
+    // { sets, cfg }. Both are read; only the new shape is ever written.
     const sets = Array.isArray(raw) ? raw : raw.sets;
-    if (Array.isArray(sets) && sets.length) return sets;
+    const cfg = Array.isArray(raw) ? {} : (raw.cfg || {});
+    if (Array.isArray(sets) && sets.length) return { sets, cfg };
   } catch { /* first run, or the file was hand-edited into rubble */ }
   const seeded = seedSets();
-  await saveSets(seeded);
-  return seeded;
+  await saveSets({ sets: seeded, cfg: {} });
+  return { sets: seeded, cfg: {} };
 }
 
 let writing = Promise.resolve();
-function saveSets(sets) {
+function saveSets({ sets, cfg }) {
   // Serialise writes and swap through a temp file: a teacher hitting SAVE
-  // twice mid-lesson must never leave a half-written JSON on disk.
+  // twice mid-lesson must never leave a half-written JSON on disk. Quiz
+  // settings (questions on/off, timer, auto-advance) ride along with the
+  // sets so ending class and starting fresh next period keeps them.
   writing = writing.then(async () => {
     const tmp = `${SETS_FILE}.tmp`;
-    await writeFile(tmp, JSON.stringify(sets, null, 2), 'utf8');
+    await writeFile(tmp, JSON.stringify({ sets, cfg }, null, 2), 'utf8');
     await rename(tmp, SETS_FILE);
   }).catch((e) => process.stderr.write(`  ! could not save question sets: ${e.message}\n`));
   return writing;
 }
 
-const initialSets = await loadSets();
+const { sets: initialSets, cfg: initialCfg } = await loadSets();
 
 // ------------------------------------------------------------------- sockets
 
@@ -96,7 +113,8 @@ let nextId = 1;
 const room = new Room({
   meta: {},
   sets: initialSets,
-  persistSets: (sets) => saveSets(sets),
+  cfg: initialCfg,
+  persistSets: (payload) => saveSets(payload),
   send: (id, msg) => {
     const ws = sockets.get(id);
     if (ws && ws.readyState === ws.OPEN) ws.send(encode(msg));
@@ -107,13 +125,17 @@ const room = new Room({
       if (ws.readyState === ws.OPEN) ws.send(payload);
     }
   },
+  onShutdown: () => shutdown(),
 });
 
 const wss = new WebSocketServer({ server: http });
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   const id = nextId++;
   sockets.set(id, ws);
-  room.join(id);
+  // The HTTP 403 above stops a student loading the console page, but nothing
+  // stops them opening a raw WebSocket from devtools and claiming role
+  // 'teacher' by hand — this is the check that actually enforces it.
+  room.join(id, isLoopback(req.socket.remoteAddress));
   ws.on('message', (raw) => room.message(id, decode(raw.toString())));
   ws.on('close', () => { sockets.delete(id); room.leave(id); });
   ws.on('error', () => { sockets.delete(id); room.leave(id); });
@@ -122,13 +144,36 @@ wss.on('connection', (ws) => {
 // --------------------------------------------------------------------- clock
 
 let last = process.hrtime.bigint();
-setInterval(() => {
+const tickTimer = setInterval(() => {
   const now = process.hrtime.bigint();
   let dt = Number(now - last) / 1e9;
   last = now;
   if (dt > 0.25) dt = 0.25;
   room.tick(dt);
 }, 1000 / TICK_HZ);
+
+// --------------------------------------------------------------- shutdown
+// Room.shutdown() has already broadcast the "session ended" message by the
+// time this runs; the ordering here is just: stop simulating, let that
+// message actually leave the socket buffers, then close everything and exit.
+// A teacher hitting the button mid-lesson must never leave question-set saves
+// half-written, so the in-flight `writing` chain is awaited before exit.
+let shuttingDown = false;
+function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  clearInterval(tickTimer);
+  setTimeout(async () => {
+    for (const ws of sockets.values()) ws.close();
+    wss.close();
+    await writing.catch(() => {});
+    http.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 500).unref?.();
+  }, 150);
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 // ---------------------------------------------------------------------- boot
 

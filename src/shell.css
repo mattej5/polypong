@@ -159,6 +159,7 @@ html:has(.admin), body:has(.admin) { overflow: auto; height: auto; }
   padding: 16px 18px 18px; min-width: 0;
 }
 .card.wide { grid-column: 1 / -1; }
+.card.danger { border-color: rgba(255,77,109,0.35); }
 .card h2 { margin: 0 0 12px; font-size: 14px; letter-spacing: 3px; color: var(--accent); }
 .btnrow { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
 .btnrow .mini, .setrow .mini, .ltable .mini { width: auto; }
