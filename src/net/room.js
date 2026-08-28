@@ -120,6 +120,14 @@ export class Room {
       this.send(connId, { t: S.ERROR, msg: 'The teacher console only works from this computer.' });
       return;
     }
+    if (msg.role === 'display' && !c.isLocal) {
+      // Same reasoning as the teacher gate above: the projector page is served
+      // to anyone on the LAN, and its role carries full match control (bots,
+      // start, pause, reset). A student who loads it — or opens a raw socket
+      // and asks for role 'display' — must be refused here.
+      this.send(connId, { t: S.ERROR, msg: 'The projector screen only works from this computer.' });
+      return;
+    }
     if (msg.role === 'display') c.role = 'display';
     else if (msg.role === 'teacher') c.role = 'teacher';
     else c.role = 'player';

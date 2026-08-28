@@ -192,9 +192,13 @@ http.listen(PORT, () => {
   process.stdout.write(
     `\n  POLYPONG server running\n` +
     `  ---------------------------------------------\n` +
-    `  Arena  (projector) :  http://${ip}:${PORT}/\n` +
+    // Arena and Admin now only work from this machine (see isLoopback()), so
+    // they're printed as localhost — the LAN address they used to show would
+    // just bounce with "only works from this computer" even opened right here,
+    // since a self-connect to your own LAN IP does not register as loopback.
+    `  Arena  (projector) :  http://localhost:${PORT}/\n` +
     `  Join   (students)  :  http://${ip}:${PORT}/play\n` +
-    `  Admin  (teacher)   :  http://${ip}:${PORT}/admin\n` +
+    `  Admin  (teacher)   :  http://localhost:${PORT}/admin\n` +
     `  ---------------------------------------------\n\n`
   );
 });

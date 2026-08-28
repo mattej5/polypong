@@ -157,6 +157,11 @@ function seatHandle(msg) {
     seat.predictor.reset();
     selfErr.textContent = '';
     selfJoin.classList.add('hidden');
+    // Enter-to-join leaves focus on a now-hidden INPUT, and typing() treats a
+    // focused INPUT as "student is typing" — swallowing every steering key for
+    // the rest of the match. Hand focus back to the page.
+    selfName.blur();
+    selfGo.blur();
     selfDot.style.background = seat.color;
     selfWho.textContent = seat.name;
     selfLives.style.color = seat.color;

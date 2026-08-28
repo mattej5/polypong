@@ -24,7 +24,7 @@ const check = (name, ok, note = '') => {
 
 function room({ humans = 0, bots = 3, sets = SETS, teacher = false } = {}) {
   const r = new Room({ send: () => {}, broadcast: () => {}, sets });
-  r.join(1); r.message(1, { t: 'hello', role: 'display' });
+  r.join(1, true); r.message(1, { t: 'hello', role: 'display' });
   if (teacher) { r.join(2); r.message(2, { t: 'hello', role: 'teacher' }); }
   for (let i = 0; i < humans; i++) {
     const id = 10 + i;
