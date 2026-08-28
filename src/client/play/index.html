@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>PolyPong</title>
+    <link rel="stylesheet" href="./play.css" />
+  </head>
+  <body>
+    <!--
+      The student page. Every screen a student can be on lives in this file and
+      is shown or hidden by play.ts; nothing is built from a template string,
+      so the whole page is greppable and the only nodes created at runtime are
+      roster rows, scoreboard rows, and the four answer buttons.
+
+      Order matters: the canvas is first and underneath everything, because the
+      arena is the main event and every other screen is something covering it.
+    -->
+    <canvas
+      id="arena"
+      tabindex="-1"
+      aria-label="The game arena. Press A to move left and D to move right."
+    ></canvas>
+
+    <main id="app">
+      <!-- 1. NAME ENTRY -->
+      <section id="s-name" class="screen">
+        <form id="join-form" class="card" novalidate>
+          <h1 class="brand">POLY<span>PONG</span></h1>
+          <label class="label" for="name-input">Type your name</label>
+          <input
+            id="name-input"
+            class="field"
+            type="text"
+            name="name"
+            maxlength="10"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            enterkeyhint="go"
+            aria-describedby="name-hint"
+          />
+          <p id="name-hint" class="hint">Up to 10 letters. Your class sees it on your wall.</p>
+          <button id="join-btn" class="btn big" type="submit">JOIN THE GAME</button>
+          <p id="join-error" class="error" role="alert" hidden></p>
+        </form>
+      </section>
+
+      <!-- 2. LOBBY -->
+      <section id="s-lobby" class="screen" hidden>
+        <div class="card wide">
+          <p class="eyebrow">YOU ARE IN</p>
+          <p class="meline">
+            <span id="lobby-swatch" class="swatch" aria-hidden="true"></span>
+            <span id="lobby-name" class="mename"></span>
+            <span id="lobby-seat" class="tag"></span>
+          </p>
+          <p id="lobby-wait" class="waiting" role="status" aria-live="polite">
+            Waiting for your teacher to start the game.
+          </p>
+          <div class="pulse" aria-hidden="true"><i></i><i></i><i></i></div>
+          <h2 class="sub">IN THIS CLASS <span id="lobby-count" class="count"></span></h2>
+          <ul id="lobby-list" class="roster"></ul>
+        </div>
+      </section>
+
+      <!-- 3. SPECTATOR / LATE JOIN -->
+      <section id="s-wait" class="screen" hidden>
+        <div class="card wide">
+          <p class="eyebrow">YOU ARE UP NEXT</p>
+          <h1 class="headline">Waiting for the next game</h1>
+          <p id="wait-why" class="waiting" role="status" aria-live="polite">
+            This round started without you. You join automatically when your teacher starts
+            the next one, so keep this page open.
+          </p>
+          <div class="pulse" aria-hidden="true"><i></i><i></i><i></i></div>
+          <h2 class="sub">PLAYING NOW <span id="wait-count" class="count"></span></h2>
+          <ul id="wait-list" class="roster"></ul>
+        </div>
+      </section>
+
+      <!-- 7. SESSION ENDED / REMOVED -->
+      <section id="s-ended" class="screen" hidden>
+        <div class="card">
+          <h1 class="brand">POLY<span>PONG</span></h1>
+          <p id="ended-msg" class="waiting" role="status"></p>
+          <button id="ended-retry" class="btn big" type="button">TRY AGAIN</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- 6. MATCH OVER -->
+    <div id="scoreboard" class="overlay" hidden>
+      <div class="sheet" role="region" aria-labelledby="sb-title">
+        <h2 id="sb-title" class="sbtitle"></h2>
+        <div class="sbhead" aria-hidden="true">
+          <span>#</span><span>NAME</span><span>QUESTIONS</span><span>WINS</span>
+        </div>
+        <ul id="sb-rows" class="sbrows"></ul>
+        <p class="sbfoot">Your teacher starts the next game from their screen.</p>
+      </div>
+    </div>
+
+    <!-- 5. QUESTION -->
+    <div
+      id="qmodal"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="q-text"
+      hidden
+    >
+      <div class="modal-card" tabindex="-1">
+        <div class="qtop">
+          <p id="q-kind" class="qkind"></p>
+          <p id="q-count" class="qcount" aria-hidden="true"></p>
+        </div>
+        <h2 id="q-text" class="qtext"></h2>
+        <div id="q-options" class="qoptions"></div>
+        <p id="q-status" class="qstatus" role="status" aria-live="polite"></p>
+        <p id="q-result" class="q-result" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <div id="netstatus" class="netstatus" role="status" aria-live="polite" hidden></div>
+
+    <script type="module" src="./play.ts"></script>
+  </body>
+</html>

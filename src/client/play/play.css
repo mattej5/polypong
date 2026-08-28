@@ -1,0 +1,532 @@
+/* The DOM chrome of the student page.
+ *
+ * It has to feel like the same product as the canvas: pure black ground, one
+ * mono family, seat hues from config.ts, and a thin bright edge on anything
+ * that matters. Everything a student touches is oversized on purpose — this is
+ * read from a Chromebook on a lap, in a room, in a hurry.
+ *
+ * NO WEBFONT. A CDN is unreachable on a LAN with no internet (SPEC C4) and
+ * would block first paint on the one screen a student is waiting at.
+ */
+
+:root {
+  --ink: #ffffff;
+  --dim: hsl(216, 34%, 74%);
+  --dimmer: hsl(216, 20%, 48%);
+  --cyan: hsl(196, 86%, 62%);
+  --good: hsl(152, 86%, 62%);
+  --bad: hsl(352, 86%, 66%);
+  --warn: hsl(34, 92%, 60%);
+  --line: hsl(216, 30%, 22%);
+  --panel: #05070b;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  color: var(--ink);
+  font-family: var(--mono);
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+/* Visible focus everywhere. Never removed, never a colour-only cue. */
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+#arena:focus-visible { outline: none; }
+
+/* --------------------------------------------------------------- arena */
+
+#arena {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #000;
+  touch-action: none;
+}
+
+/* -------------------------------------------------------------- screens */
+
+#app {
+  position: relative;
+  z-index: 1;
+}
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+  background: #000;
+}
+
+.card {
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 26px 24px 30px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.card.wide { width: min(560px, 100%); }
+
+.brand {
+  margin: 0 0 6px;
+  font-size: clamp(30px, 9vw, 46px);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--cyan);
+  text-align: center;
+  text-shadow: 0 0 18px hsla(196, 86%, 62%, 0.45);
+}
+.brand span { color: var(--ink); }
+
+.headline {
+  margin: 0;
+  font-size: clamp(22px, 6vw, 30px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--dimmer);
+}
+
+.sub {
+  margin: 18px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--dimmer);
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.count { color: var(--dim); }
+
+.label {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+}
+
+.field {
+  width: 100%;
+  padding: 16px 14px;
+  font: 800 28px/1.2 var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  background: #000;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+}
+.field:focus {
+  border-color: var(--cyan);
+  outline: none;
+  box-shadow: 0 0 0 3px hsla(196, 86%, 62%, 0.28);
+}
+
+.hint {
+  margin: -4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dimmer);
+}
+
+.btn {
+  font: 800 16px/1 var(--mono);
+  letter-spacing: 0.12em;
+  color: #000;
+  background: var(--cyan);
+  border: 2px solid var(--cyan);
+  border-radius: 10px;
+  padding: 14px 18px;
+  cursor: pointer;
+}
+.btn.big {
+  min-height: 60px;
+  font-size: 18px;
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.btn:not(:disabled):active { transform: translateY(1px); }
+
+.error {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--bad);
+  border: 1px solid var(--bad);
+  border-left-width: 5px;
+  border-radius: 8px;
+  background: hsla(352, 86%, 66%, 0.08);
+}
+
+.waiting {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--dim);
+}
+
+.meline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+.mename {
+  font-size: clamp(24px, 7vw, 34px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+.swatch {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  background: var(--dim);
+}
+.swatch.small {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+.tag {
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  border: 1px solid var(--dim);
+  border-radius: 999px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.tag.you {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+/* Three dots that keep moving, so several minutes of lobby never reads as a
+ * frozen page. Motion is dropped entirely for anyone who asked for that. */
+.pulse {
+  display: flex;
+  gap: 8px;
+}
+.pulse i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--cyan);
+  opacity: 0.25;
+  animation: blip 1.4s ease-in-out infinite;
+}
+.pulse i:nth-child(2) { animation-delay: 0.2s; }
+.pulse i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blip {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse i { animation: none; opacity: 0.6; }
+}
+
+/* --------------------------------------------------------------- roster */
+
+.roster {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+.rrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 8px;
+  font-size: 16px;
+}
+.rrow.me {
+  background: hsla(196, 86%, 62%, 0.1);
+  outline: 1px solid hsla(196, 86%, 62%, 0.45);
+}
+.rrow.empty {
+  color: var(--dimmer);
+  font-size: 14px;
+}
+.rname {
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+.rstate {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--dimmer);
+}
+
+/* ----------------------------------------------------------- scoreboard */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.82);
+}
+.sheet {
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.sbtitle {
+  margin: 0 0 16px;
+  font-size: clamp(22px, 6vw, 30px);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-align: center;
+  color: var(--warn);
+}
+.sbhead,
+.sbrow {
+  display: grid;
+  grid-template-columns: 34px 1fr 92px 48px;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 8px;
+}
+.sbhead {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--dimmer);
+  border-bottom: 1px solid var(--line);
+}
+.sbrows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sbrow {
+  font-size: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.sbrow.me {
+  background: hsla(196, 86%, 62%, 0.1);
+  outline: 1px solid hsla(196, 86%, 62%, 0.45);
+  border-radius: 8px;
+}
+.sbplace {
+  font-weight: 800;
+  color: var(--dim);
+  text-align: center;
+}
+.sbplace.first { color: var(--warn); }
+.sbname { overflow-wrap: anywhere; }
+.sbq,
+.sbw {
+  font-size: 14px;
+  color: var(--dim);
+  text-align: right;
+}
+.sbfoot {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--dimmer);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------- question */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.9);
+}
+.modal-card {
+  width: min(680px, 100%);
+  max-height: 96vh;
+  overflow-y: auto;
+  padding: 20px;
+  border: 2px solid var(--cyan);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.modal-card:focus { outline: none; }
+.modal-card.watching { border-color: var(--dim); }
+
+.qtop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 10px;
+}
+.qkind {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--cyan);
+}
+.modal-card.watching .qkind { color: var(--dim); }
+.qcount {
+  margin: 0;
+  font-size: clamp(20px, 5vw, 26px);
+  font-weight: 800;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.qcount.urgent { color: var(--warn); }
+
+.qtext {
+  margin: 0 0 16px;
+  font-size: clamp(19px, 4.4vw, 26px);
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.qoptions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 62px;
+  padding: 12px 14px;
+  text-align: left;
+  font: 600 18px/1.35 var(--mono);
+  color: var(--ink);
+  background: #000;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.opt:not(:disabled):hover { border-color: var(--cyan); }
+.opt:disabled { cursor: default; }
+.opt-key {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  font-weight: 800;
+  color: var(--cyan);
+  border: 2px solid var(--cyan);
+  border-radius: 8px;
+}
+.opt-text {
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+.opt-tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+  text-align: right;
+}
+/* Result states carry a WORD in .opt-tag as well as the colour, so the
+ * correct answer is never signalled by hue alone (SPEC §9). */
+.opt.correct {
+  border-color: var(--good);
+  background: hsla(152, 86%, 62%, 0.12);
+}
+.opt.correct .opt-key,
+.opt.correct .opt-tag { color: var(--good); border-color: var(--good); }
+.opt.wrong {
+  border-color: var(--bad);
+  background: hsla(352, 86%, 66%, 0.12);
+}
+.opt.wrong .opt-key,
+.opt.wrong .opt-tag { color: var(--bad); border-color: var(--bad); }
+.opt.chosen { border-width: 3px; }
+.opt:disabled:not(.correct):not(.wrong):not(.chosen) { opacity: 0.65; }
+.modal-card.watching .opt-key { color: var(--dim); border-color: var(--dim); }
+
+.qstatus {
+  margin: 16px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.q-result {
+  margin: 8px 0 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.45;
+  min-height: 1.45em;
+}
+.q-result.good { color: var(--good); }
+.q-result.bad { color: var(--bad); }
+.q-result.neutral { color: var(--dim); }
+
+/* ---------------------------------------------------------- net status */
+
+.netstatus {
+  position: fixed;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-align: center;
+  color: #000;
+  background: var(--warn);
+}
+
+@media (max-width: 420px) {
+  .card { padding: 20px 16px 24px; }
+  .opt { font-size: 16px; min-height: 56px; }
+}

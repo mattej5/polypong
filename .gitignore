@@ -1,3 +1,10 @@
 node_modules/
-server/question-sets.json
-server/question-sets.json.tmp
+dist/
+build/
+.DS_Store
+*.log
+
+# Saved teacher question sets from the archived build. Local data, and it
+# carries answer keys -- it does not belong in a public repository.
+archive/server/question-sets.json
+archive/server/question-sets.json.tmp

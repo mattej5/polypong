@@ -1,0 +1,434 @@
+/* Teacher console skin. Same product as the canvas: near-black ground, CRT
+   vector accents, mono type, high contrast. Everything is sized larger than a
+   normal web app would be, because this page is projected onto a classroom
+   wall and read from the back row (SPEC 9). System font stack only - nothing
+   is fetched, because the machine serving this page may have no route to the
+   internet at all. */
+
+:root {
+  --bg: #05070a;
+  --panel: #0b0f15;
+  --panel-2: #10151d;
+  --line: #1d2733;
+  --line-hi: #2c3b4d;
+  --ink: #e8f2ff;
+  --dim: hsl(216, 34%, 74%);
+  --dimmer: hsl(216, 20%, 52%);
+  --go: hsl(152, 86%, 62%);
+  --urgent: hsl(50, 96%, 62%);
+  --bad: hsl(352, 86%, 64%);
+  --cool: hsl(196, 86%, 62%);
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+/* The `hidden` attribute is how every panel on this page is shown and hidden,
+   and the UA stylesheet's `display: none` for it loses to any class here that
+   sets a display. Stating it once, loudly, is cheaper than remembering to
+   guard every flex container individually. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 15px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 8px;
+  padding: 10px 12px 12px;
+}
+
+/* ------------------------------------------------------------- join URL
+   The single most-read thing on the page. A teacher copies this onto a
+   whiteboard while 25 students wait, so it is the biggest type here by a
+   wide margin and it never scrolls away. */
+
+#top {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  padding: 10px 14px;
+}
+
+#joinbox { flex: 1 1 auto; min-width: 0; }
+
+.eyebrow {
+  color: var(--dimmer);
+  letter-spacing: 0.22em;
+  font-size: 13px;
+}
+
+#joinrow { display: flex; align-items: center; gap: 14px; }
+
+#joinurl {
+  font-size: clamp(28px, 4.4vw, 64px);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--go);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.1;
+  text-shadow: 0 0 18px hsla(152, 86%, 62%, 0.28);
+}
+
+#joinnote { color: var(--dimmer); font-size: 12px; margin-top: 2px; }
+#joinnote a { color: var(--cool); }
+
+#topright {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.chip {
+  border: 1px solid var(--line-hi);
+  border-radius: 999px;
+  padding: 2px 12px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.chip.live { color: var(--go); border-color: var(--go); }
+.chip.dead { color: var(--bad); border-color: var(--bad); }
+.chip.hot { color: var(--urgent); border-color: var(--urgent); }
+
+/* ---------------------------------------------------------------- buttons */
+
+.btn {
+  background: var(--panel-2);
+  border: 1px solid var(--line-hi);
+  border-radius: 6px;
+  color: var(--ink);
+  padding: 7px 14px;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { border-color: var(--cool); color: var(--cool); }
+.btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.btn.huge {
+  font-size: clamp(15px, 1.5vw, 22px);
+  font-weight: 800;
+  padding: 10px 30px;
+  letter-spacing: 0.16em;
+}
+.btn.small { font-size: 12px; padding: 4px 9px; letter-spacing: 0.1em; }
+.btn.ghost { background: rgba(5, 7, 10, 0.72); }
+
+.btn.go { color: var(--go); border-color: var(--go); }
+.btn.go:hover:not(:disabled) { background: hsla(152, 86%, 62%, 0.12); color: var(--go); }
+.btn.urgent { color: var(--urgent); border-color: var(--urgent); }
+.btn.urgent:hover:not(:disabled) { background: hsla(50, 96%, 62%, 0.14); color: var(--urgent); }
+.btn.danger { color: var(--bad); border-color: hsla(352, 86%, 64%, 0.5); }
+.btn.danger:hover:not(:disabled) { background: hsla(352, 86%, 64%, 0.14); color: var(--bad); }
+
+#controls { display: flex; align-items: center; gap: 10px; }
+.grow { flex: 1 1 auto; }
+
+/* ------------------------------------------------------------------ warn */
+
+.warn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--urgent);
+  border-left-width: 6px;
+  border-radius: 6px;
+  background: hsla(50, 96%, 62%, 0.08);
+  color: var(--urgent);
+  padding: 9px 12px;
+  font-size: 14px;
+}
+.warn span { color: var(--ink); font-size: 13px; }
+.warn button { margin-left: auto; }
+
+/* ------------------------------------------------------------ main layout
+   The arena is the visual centre and takes every pixel the side column does
+   not need. The side column scrolls; the arena never does. */
+
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 27vw, 520px);
+  gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#arenawrap {
+  position: relative;
+  background: #000;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+#arena { display: block; width: 100%; height: 100%; }
+
+#arenawrap:fullscreen { border-radius: 0; border: 0; }
+
+#fs { position: absolute; right: 10px; bottom: 10px; }
+
+.arenamsg {
+  position: absolute;
+  inset: 0;
+  /* A scrim, so the arena left over from the last match reads as finished
+     rather than as a game the teacher is somehow already missing. */
+  background: rgba(2, 4, 7, 0.72);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--dim);
+  letter-spacing: 0.2em;
+  font-size: clamp(14px, 1.7vw, 26px);
+  pointer-events: none;
+  padding: 20px;
+}
+.arenamsg small { letter-spacing: 0.1em; font-size: 13px; color: var(--dimmer); }
+
+#side { overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 2px; }
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px 12px 12px;
+}
+.panel.accent { border-color: var(--urgent); background: hsla(50, 96%, 62%, 0.05); }
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.26em;
+  color: var(--dimmer);
+  font-weight: 700;
+}
+.panel h2 .count { color: var(--dim); letter-spacing: 0.1em; }
+.empty { color: var(--dimmer); font-size: 13px; margin: 4px 0 0; }
+
+/* ---------------------------------------------------------------- roster */
+
+.rrow {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto auto;
+  grid-template-areas: "sw name pips acts" ". meta meta meta";
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 1px;
+  padding: 6px 2px;
+  border-bottom: 1px solid var(--line);
+  font-size: 15px;
+}
+.rrow:last-child { border-bottom: 0; }
+
+.swatch { grid-area: sw; width: 16px; height: 16px; border-radius: 3px; background: #26313f; }
+.rname {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.rname input {
+  width: 100%;
+  background: #000;
+  border: 1px solid var(--cool);
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-weight: 800;
+}
+.pips { grid-area: pips; letter-spacing: 0.16em; font-size: 14px; color: var(--dim); }
+.racts { grid-area: acts; display: flex; gap: 5px; }
+
+.rmeta {
+  grid-area: meta;
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--dimmer);
+}
+.rstatus { font-weight: 700; }
+.rconn.drop { color: var(--urgent); font-weight: 700; }
+
+.st-alive { color: var(--go); }
+.st-waiting { color: var(--dimmer); }
+.st-out { color: var(--bad); }
+.st-revive { color: var(--urgent); }
+
+/* -------------------------------------------------------------- settings */
+
+.set {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.set:last-child { border-bottom: 0; }
+.set .name { flex: 1 1 auto; color: var(--dim); font-size: 13px; letter-spacing: 0.08em; }
+.set .val { min-width: 62px; text-align: center; font-weight: 800; font-size: 17px; }
+.step { width: 34px; padding: 4px 0; text-align: center; font-weight: 800; }
+.set select {
+  background: var(--panel-2);
+  border: 1px solid var(--line-hi);
+  border-radius: 6px;
+  padding: 6px 8px;
+  max-width: 62%;
+}
+.toggle { min-width: 78px; text-align: center; }
+.toggle.on { color: var(--go); border-color: var(--go); }
+.toggle.off { color: var(--dimmer); }
+.locked { color: var(--urgent); }
+fieldset { border: 0; margin: 0; padding: 0; }
+fieldset:disabled { opacity: 0.42; }
+
+/* ------------------------------------------------------------- questions */
+
+.qmeta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.qcount { font-size: 26px; font-weight: 800; }
+.qtimer { font-size: 26px; font-weight: 800; color: var(--urgent); }
+.qtext { font-size: 17px; font-weight: 700; margin: 6px 0 8px; }
+.qopt {
+  padding: 4px 8px;
+  border-left: 3px solid var(--line-hi);
+  margin-bottom: 3px;
+  color: var(--dim);
+  font-size: 14px;
+}
+.qopt.correct { border-left-color: var(--go); color: var(--go); font-weight: 800; }
+.qhidden { color: var(--dimmer); font-size: 12px; letter-spacing: 0.1em; margin: 6px 0 0; }
+
+.waitbox {
+  border: 1px solid var(--urgent);
+  border-radius: 6px;
+  padding: 7px 10px;
+  margin: 8px 0;
+  background: hsla(50, 96%, 62%, 0.07);
+}
+.waitbox .eyebrow { color: var(--urgent); }
+.waitnames { font-size: clamp(16px, 1.9vw, 26px); font-weight: 800; line-height: 1.25; }
+.donenames { color: var(--dimmer); font-size: 12px; margin-top: 6px; word-break: break-word; }
+.outcome { font-size: 13px; padding: 2px 0; border-bottom: 1px solid var(--line); }
+.outcome:last-child { border-bottom: 0; }
+.delta-up { color: var(--go); }
+.delta-down { color: var(--bad); }
+
+/* ------------------------------------------------------------------ sets */
+
+.field { margin-bottom: 8px; }
+.field label { display: block; color: var(--dimmer); font-size: 11px; letter-spacing: 0.16em; margin-bottom: 3px; }
+.field input[type="text"], .field textarea {
+  width: 100%;
+  background: #000;
+  border: 1px solid var(--line-hi);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.field textarea { min-height: 92px; resize: vertical; font-size: 12px; }
+.setsrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.preview { font-size: 13px; margin: 6px 0; }
+.preview.ok { color: var(--go); }
+.preview.none { color: var(--dimmer); }
+.issues { margin: 4px 0 0; padding: 0; list-style: none; max-height: 168px; overflow-y: auto; }
+.issues li {
+  color: var(--bad);
+  font-size: 12px;
+  padding: 3px 6px;
+  border-left: 3px solid var(--bad);
+  margin-bottom: 2px;
+  background: hsla(352, 86%, 64%, 0.07);
+}
+.issues li b { color: var(--ink); }
+.savedset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.savedset:last-child { border-bottom: 0; }
+.savedset .sname { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.savedset .scount { color: var(--dimmer); font-size: 12px; white-space: nowrap; }
+.note { font-size: 12px; color: var(--go); margin-left: 6px; }
+
+/* ------------------------------------------------------------ scoreboard */
+
+.scorerow {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 74px 68px;
+  gap: 8px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.scorerow.head { color: var(--dimmer); font-size: 11px; letter-spacing: 0.14em; }
+.scorerow:last-child { border-bottom: 0; }
+.place { font-weight: 800; color: var(--urgent); }
+
+/* -------------------------------------------------------------- overlays */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+.overlay[hidden] { display: none; }
+.dialog {
+  border: 1px solid var(--line-hi);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 26px 30px;
+  max-width: 620px;
+  text-align: center;
+}
+.dialog p { font-size: clamp(17px, 2vw, 26px); margin: 0 0 20px; }
+.dialogrow { display: flex; gap: 14px; justify-content: center; }
+
+.fatal {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: var(--bad);
+  color: #000;
+  padding: 8px 14px;
+  font-size: 13px;
+  z-index: 30;
+}
+.fatal[hidden] { display: none; }
+
+@media (max-width: 1080px) {
+  main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(220px, 46vh) auto; }
+  #app { overflow-y: auto; }
+}

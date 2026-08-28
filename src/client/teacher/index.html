@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>PolyPong — Teacher</title>
+    <link rel="stylesheet" href="./console.css" />
+  </head>
+  <body>
+    <!--
+      The teacher console. Every dynamic node below is filled by console.ts;
+      the markup here is the skeleton and the three things a teacher needs in
+      a hurry - the join URL, START, and END GAME - are the first three things
+      on the page, in that order, at the largest type on it.
+    -->
+    <div id="app">
+      <header id="top">
+        <div id="joinbox">
+          <div class="eyebrow">STUDENTS JOIN AT</div>
+          <div id="joinrow">
+            <div id="joinurl" title="The address students type into their Chromebook">&mdash;</div>
+            <button id="copy" class="btn" type="button">COPY</button>
+          </div>
+          <div id="joinnote">
+            This address can change between class periods. It is always current here.
+            <a id="healthlink" href="/health" target="_blank" rel="noopener">Network check</a>
+          </div>
+        </div>
+        <div id="topright">
+          <div id="link" class="chip">CONNECTING</div>
+          <div id="phase" class="chip">LOBBY</div>
+          <div id="joined" class="chip">0 JOINED</div>
+          <button id="mute" class="btn" type="button">SOUND ON</button>
+        </div>
+      </header>
+
+      <div id="warn" class="warn" hidden>
+        <strong>No student has connected yet.</strong>
+        <span>
+          If students say the address does not load, macOS may have blocked incoming
+          connections. Check System Settings &rarr; Network &rarr; Firewall, allow
+          PolyPong, and have one student open the Network check link above.
+        </span>
+        <button id="warndismiss" class="btn small" type="button">DISMISS</button>
+      </div>
+
+      <nav id="controls">
+        <button id="start" class="btn huge go" type="button">START</button>
+        <button id="end" class="btn huge" type="button">END GAME</button>
+        <button id="rematch" class="btn huge" type="button">REMATCH</button>
+        <button id="closenow" class="btn huge urgent" type="button" hidden>CLOSE NOW</button>
+        <span class="grow"></span>
+        <button id="quit" class="btn danger" type="button">QUIT</button>
+      </nav>
+
+      <main>
+        <section id="arenawrap">
+          <canvas id="arena"></canvas>
+          <div id="arenamsg" class="arenamsg" hidden></div>
+          <button id="fs" class="btn small ghost" type="button">FULL SCREEN</button>
+        </section>
+
+        <aside id="side">
+          <section id="panel-question" class="panel accent" hidden>
+            <h2>QUESTION</h2>
+            <div id="q-body"></div>
+          </section>
+
+          <section id="panel-roster" class="panel">
+            <h2>ROSTER <span id="rostercount" class="count"></span></h2>
+            <div id="roster"></div>
+            <p id="rosterempty" class="empty">
+              Nobody has joined yet. Students go to the address at the top of this page.
+            </p>
+          </section>
+
+          <section id="panel-settings" class="panel">
+            <h2>SETTINGS <span id="settingslock" class="count"></span></h2>
+            <div id="settings"></div>
+          </section>
+
+          <section id="panel-sets" class="panel">
+            <h2>QUESTION SETS</h2>
+            <div id="sets"></div>
+          </section>
+
+          <section id="panel-score" class="panel" hidden>
+            <h2>SCOREBOARD</h2>
+            <div id="score"></div>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <div id="confirm" class="overlay" hidden>
+      <div class="dialog">
+        <p id="confirmtext"></p>
+        <div class="dialogrow">
+          <button id="confirmno" class="btn huge" type="button">CANCEL</button>
+          <button id="confirmyes" class="btn huge danger" type="button">YES</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="ended" class="overlay" hidden>
+      <div class="dialog">
+        <p id="endedtext"></p>
+      </div>
+    </div>
+
+    <div id="fatal" class="fatal" hidden></div>
+
+    <script type="module" src="./console.ts"></script>
+  </body>
+</html>

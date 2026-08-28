@@ -1,0 +1,63 @@
+#!/bin/bash
+# Polypong launcher. Starts the classroom server, opens the arena, and holds a
+# dialog open as the stop button. Quitting the dialog stops the server.
+
+REPO="/Users/vinjones/Workspaces/polypong"
+
+say() { osascript -e "display dialog \"$1\" buttons {\"OK\"} default button 1 with title \"Polypong\" with icon caution" >/dev/null 2>&1; }
+
+# GUI apps get a minimal PATH, so probe the usual install locations by hand.
+NODE=""
+for c in /opt/homebrew/bin/node /usr/local/bin/node "$HOME/.volta/bin/node" \
+         "$HOME/.bun/bin/node" /usr/bin/node; do
+  [ -x "$c" ] && NODE="$c" && break
+done
+if [ -z "$NODE" ]; then
+  for c in "$HOME"/.nvm/versions/node/*/bin/node \
+           "$HOME"/.local/share/fnm/node-versions/*/installation/bin/node; do
+    [ -x "$c" ] && NODE="$c" && break
+  done
+fi
+[ -z "$NODE" ] && { say "Node.js was not found on this Mac. Polypong needs it to run the classroom server."; exit 1; }
+[ -d "$REPO" ] || { say "Could not find the Polypong files at $REPO."; exit 1; }
+[ -d "$REPO/node_modules/ws" ] || { say "Polypong is missing its dependencies. Open Terminal and run: cd $REPO && pnpm install"; exit 1; }
+
+# First free port from 5180 up, so a stale copy never blocks a fresh launch.
+PORT=5180
+while [ "$PORT" -lt 5200 ] && lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; do
+  PORT=$((PORT + 1))
+done
+
+cd "$REPO" || exit 1
+PORT="$PORT" "$NODE" server/node.js >/tmp/polypong.log 2>&1 &
+SERVER=$!
+trap 'kill $SERVER 2>/dev/null; exit 0' EXIT INT TERM
+
+for _ in $(seq 1 40); do
+  lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1 && break
+  sleep 0.25
+done
+if ! kill -0 $SERVER 2>/dev/null; then
+  say "The Polypong server could not start. Details are in /tmp/polypong.log"
+  exit 1
+fi
+
+IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo localhost)
+open "http://localhost:$PORT/"
+
+osascript >/dev/null 2>&1 <<OSA
+display dialog "Polypong is running.
+
+Students join on this Wi-Fi at:
+    $IP:$PORT/play
+
+Teacher question sets:
+    $IP:$PORT/admin
+
+The arena has opened in your browser. Put that window on the projector.
+
+Click Stop Server when class is over." buttons {"Stop Server"} default button 1 with title "Polypong"
+OSA
+
+kill $SERVER 2>/dev/null
+exit 0
