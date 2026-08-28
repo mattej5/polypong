@@ -46,6 +46,10 @@
         <button id="start">START GAME</button>
       </div>
     </div>
+    <label class="check">
+      <input type="checkbox" id="questionstogglelobby" />
+      <span>Ask quiz questions during the match</span>
+    </label>
     <div id="err" class="err"></div>
   </div>
 </div>
@@ -53,6 +57,10 @@
 <div id="hud" class="teacherbar hidden">
   <button id="pause" class="mini">PAUSE</button>
   <button id="reset" class="mini">END GAME</button>
+  <label class="check inline">
+    <input type="checkbox" id="questionstoggle" />
+    <span>Questions</span>
+  </label>
   <span id="conn" class="conn">connected</span>
 
   <!-- Only ever visible to someone who claimed a seat on this screen. -->

@@ -22,7 +22,18 @@ function makeEdge(a, b, owner, center) {
   let n = { x: -dir.y, y: dir.x };
   const mid = lerp(a, b, 0.5);
   if (dot(sub(center, mid), n) < 0) n = mul(n, -1);
-  return { a, b, dir, n, length, owner, mid };
+  // `dir` is a pure artifact of polygon winding — every edge shares one
+  // rotational sense around the arena, so "+dir" is rightward on one edge and
+  // leftward, upward, or downward on the next. A human's ArrowRight/D key
+  // means only one thing: the direction their own right hand points while
+  // facing the arena (facing along `n`, which already points inward — see
+  // above). That's `n` rotated 90°; `rightSign` is whichever sign of `dir`
+  // agrees with it, so `inputDir * edge.rightSign` always reads as "their
+  // right" no matter which edge they hold. Bots ignore this — their AI steers
+  // by targeting a point along `dir` directly, never through a keypress.
+  const right = rot(n, Math.PI / 2);
+  const rightSign = dot(dir, right) < 0 ? -1 : 1;
+  return { a, b, dir, n, length, owner, mid, rightSign };
 }
 
 /**

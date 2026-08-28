@@ -16,6 +16,7 @@ const el = {
   tabForm: $('tab-form'), tabCsv: $('tab-csv'),
   paneForm: $('pane-form'), paneCsv: $('pane-csv'),
   qList: $('qlist'), addQ: $('addq'), useCsv: $('usecsv'), dropVeil: $('dropveil'),
+  arenaUrl: $('arenaurl'),
 };
 
 let socket = null;
@@ -56,7 +57,12 @@ function handle(msg) {
     case S.QUIZ_END:  return onEnd(msg);
     case S.QUIZ_OFF:  return clearLive();
     case S.QUIZ_LOG:  return onLog(msg);
+    case S.LOBBY:     return onLobby(msg);
   }
+}
+
+function onLobby(msg) {
+  if (msg.meta && msg.meta.arenaUrl) el.arenaUrl.textContent = msg.meta.arenaUrl;
 }
 
 // ------------------------------------------------------------------- settings

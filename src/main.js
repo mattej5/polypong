@@ -15,6 +15,10 @@ function syncInput() {
     let dir = 0;
     if (held.has(p.keys[0])) dir -= 1;
     if (held.has(p.keys[1])) dir += 1;
+    // p.keys[1] is this player's own "right" key — but the paddle physics
+    // only understands +edge.dir, which is an arbitrary polygon-winding
+    // direction shared by every edge. See edge.rightSign in geometry.js.
+    if (p.edge) dir *= p.edge.rightSign;
     game.setInput(p.idx, dir);
   }
 }

@@ -52,6 +52,11 @@ export const S = {
   QUIZ_END: 'qend',   // { qid, correct, options, yours?, youWere?, revived? }
   QUIZ_OFF: 'qoff',   // {}   no question open (sent on join so late tabs settle)
 
+  // quiz — projector only. Just the on/off bit, deliberately never the sets
+  // themselves — those carry the answer key in plain CSV, and the projector
+  // is what the whole class is looking at.
+  QUIZ_STATE: 'qstate', // { enabled }
+
   // quiz — teacher console only
   SETS: 'sets',       // { sets:[{id,name,count,twoOption}], cfg:{...} }
   QUIZ_LIVE: 'qlive', // { qid, rows:[{slot,name,answered,correct,remaining,extension}] }

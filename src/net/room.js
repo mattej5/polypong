@@ -30,10 +30,11 @@ export class Room {
   // snapshot is ~500 bytes, so 30Hz to 8 clients is ~120KB/s on a LAN.
   constructor({
     send, broadcast, snapHz = 30, meta = {}, sets = [], cfg = {}, persistSets = null,
-    onShutdown = null, rand = Math.random,
+    onShutdown = null, displayKey = null, rand = Math.random,
   }) {
     this.send = send;
     this.broadcast = broadcast;
+    this.displayKey = displayKey;   // see the 'display' branch in hello()
     // Adapter-supplied: closing sockets and exiting the process is transport
     // work the Room itself must never do (see the class doc above).
     this.onShutdown = typeof onShutdown === 'function' ? onShutdown : () => {};
@@ -120,12 +121,18 @@ export class Room {
       this.send(connId, { t: S.ERROR, msg: 'The teacher console only works from this computer.' });
       return;
     }
-    if (msg.role === 'display' && !c.isLocal) {
-      // Same reasoning as the teacher gate above: the projector page is served
-      // to anyone on the LAN, and its role carries full match control (bots,
-      // start, pause, reset). A student who loads it — or opens a raw socket
-      // and asks for role 'display' — must be refused here.
-      this.send(connId, { t: S.ERROR, msg: 'The projector screen only works from this computer.' });
+    // Unlike the teacher console, the projector screen legitimately runs on a
+    // SEPARATE machine from the server — a second laptop or Chromebook plugged
+    // into the classroom projector. isLocal alone would lock that out, so a
+    // non-local 'display' hello is allowed through only with the per-boot key
+    // the server printed in its own startup banner (also shown on /admin) —
+    // something a student browsing to '/' cold has no way to know.
+    const keyOk = this.displayKey && msg.key === this.displayKey;
+    if (msg.role === 'display' && !c.isLocal && !keyOk) {
+      this.send(connId, {
+        t: S.ERROR,
+        msg: 'The projector screen needs the class link from your teacher console.',
+      });
       return;
     }
     if (msg.role === 'display') c.role = 'display';
@@ -135,6 +142,10 @@ export class Room {
     if (c.role !== 'player') {
       this.send(connId, { t: S.WELCOME, id: connId, role: c.role, slot: null, protocol: PROTOCOL });
       if (c.role === 'teacher') { this.pushSets(connId); this.pushLog(connId); }
+      // The projector gets the on/off state, never the sets themselves — those
+      // carry the answer key in plain CSV, and this connection is what a whole
+      // class is looking at.
+      if (c.role === 'display') this.send(connId, { t: S.QUIZ_STATE, enabled: this.quizEnabled });
       this.pushLobby();
       this.pushQuizTo(connId, c);
       return;
@@ -209,6 +220,17 @@ export class Room {
         this.applyPause();
         break;
       case C.RESET: this.resetToLobby(); break;
+      case C.QUIZ_CFG:
+        // The projector page has one quiz control — on/off — not the full
+        // teacher console. Only `enabled` is honored here; anything else in
+        // the message (set choice, timer, ...) is teacher-console-only.
+        if (msg.enabled !== undefined) {
+          this.quizEnabled = !!msg.enabled;
+          this.persistAll();
+          this.broadcastSets();
+          this.broadcastQuizState();
+        }
+        break;
     }
   }
 
@@ -299,6 +321,7 @@ export class Room {
     if (msg.enabled !== undefined) this.quizEnabled = !!msg.enabled;
     this.persistAll();
     this.broadcastSets();
+    this.broadcastQuizState();
   }
 
   /** Everything the adapter needs to bring this room back exactly as it was
@@ -352,6 +375,13 @@ export class Room {
   broadcastSets() {
     const payload = this.setsPayload();
     for (const [id, c] of this.conns) if (c.role === 'teacher') this.send(id, payload);
+  }
+
+  /** Same on/off bit as setsPayload().cfg.enabled, but alone — the projector
+   * gets this, never the full sets payload, which carries the answer key. */
+  broadcastQuizState() {
+    const payload = { t: S.QUIZ_STATE, enabled: this.quizEnabled };
+    for (const [id, c] of this.conns) if (c.role === 'display') this.send(id, payload);
   }
 
   pushLog(connId) {

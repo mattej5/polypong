@@ -211,10 +211,16 @@ let dir = 0;
 function setDir(d) {
   if (d === dir) return;
   dir = d;
+  // `dir` here is the key the student pressed, not the value the paddle
+  // physics wants: which way is "your right" depends on where your edge sits
+  // on the polygon (see edge.rightSign in geometry.js's makeEdge) — without
+  // this, most seats would find the right key steers their paddle left.
+  const p = game.players[me.slot];
+  const corrected = p && p.edge ? d * p.edge.rightSign : d;
   // Tell the predictor before the network, not after: the point of prediction
   // is that the paddle has already moved by the time the packet leaves.
-  predictor.setDir(d, nowSec());
-  sendMsg({ t: C.INPUT, d });
+  predictor.setDir(corrected, nowSec());
+  sendMsg({ t: C.INPUT, d: corrected });
   document.getElementById('left').classList.toggle('active', d === -1);
   document.getElementById('right').classList.toggle('active', d === 1);
 }

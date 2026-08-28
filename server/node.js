@@ -1,6 +1,7 @@
 // Node transport adapter. Everything runtime-specific lives here: http, ws,
 // the clock, and finding the LAN address. Room and Game stay portable.
 import { createServer } from 'node:http';
+import { randomBytes } from 'node:crypto';
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { networkInterfaces } from 'node:os';
 import { dirname, extname, join, normalize } from 'node:path';
@@ -15,6 +16,11 @@ import { SAMPLE_SETS } from './sample-sets.js';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = Number(process.env.PORT) || 5180;
 const TICK_HZ = 60;
+// One per boot, not persisted: the projector (arena.html) legitimately runs
+// on a second device — a Chromebook or laptop plugged into the classroom
+// projector — so it can't be gated to loopback like the teacher console.
+// This key is how it proves it got the link from the teacher, not a guess.
+const DISPLAY_KEY = randomBytes(6).toString('hex');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -114,6 +120,7 @@ const room = new Room({
   meta: {},
   sets: initialSets,
   cfg: initialCfg,
+  displayKey: DISPLAY_KEY,
   persistSets: (payload) => saveSets(payload),
   send: (id, msg) => {
     const ws = sockets.get(id);
@@ -189,14 +196,16 @@ function lanAddress() {
 http.listen(PORT, () => {
   const ip = lanAddress();
   room.meta.joinUrl = `${ip}:${PORT}/play`;
+  // The projector may be a second device (see the 'display' branch in
+  // Room.hello()), so its link carries the per-boot key. Opened on this same
+  // machine, the key is harmless and unnecessary (isLocal already covers it),
+  // but it works either way, so one link serves both cases.
+  room.meta.arenaUrl = `${ip}:${PORT}/?key=${DISPLAY_KEY}`;
   process.stdout.write(
     `\n  POLYPONG server running\n` +
     `  ---------------------------------------------\n` +
-    // Arena and Admin now only work from this machine (see isLoopback()), so
-    // they're printed as localhost — the LAN address they used to show would
-    // just bounce with "only works from this computer" even opened right here,
-    // since a self-connect to your own LAN IP does not register as loopback.
-    `  Arena  (projector) :  http://localhost:${PORT}/\n` +
+    `  Arena  (projector) :  http://${room.meta.arenaUrl}\n` +
+    `                         (or http://localhost:${PORT}/ on this machine)\n` +
     `  Join   (students)  :  http://${ip}:${PORT}/play\n` +
     `  Admin  (teacher)   :  http://localhost:${PORT}/admin\n` +
     `  ---------------------------------------------\n\n`

@@ -27,11 +27,16 @@ const nowSec = () => performance.now() / 1000;
 
 let socket = null;
 
+// Set when this page was opened via the link the teacher console prints
+// (?key=...) — proves this device was handed the link, not guessing at '/'.
+// Opened on the server's own machine, no key is needed at all.
+const DISPLAY_KEY = new URLSearchParams(location.search).get('key') || undefined;
+
 function connect() {
   socket = new WebSocket(`ws://${location.host}`);
   socket.addEventListener('open', () => {
     setConn('connected');
-    socket.send(encode({ t: C.HELLO, role: 'display' }));
+    socket.send(encode({ t: C.HELLO, role: 'display', key: DISPLAY_KEY }));
   });
   socket.addEventListener('message', (e) => handle(decode(e.data)));
   socket.addEventListener('close', () => {
@@ -52,6 +57,7 @@ function handle(msg) {
   if (msg.t === S.QUIZ_TICK) return wallTick(msg);
   if (msg.t === S.QUIZ_END) return wallEnd(msg);
   if (msg.t === S.QUIZ_OFF) return wallHide();
+  if (msg.t === S.QUIZ_STATE) return onQuizState(msg);
   if (msg.t === S.SNAP) {
     stream.push(msg.c, msg.s);
     // Prediction anchors on the newest raw snapshot, not the interpolated one.
@@ -196,8 +202,12 @@ const typing = () => {
 function setDir(d) {
   if (!seated() || d === seat.dir) return;
   seat.dir = d;
-  seat.predictor.setDir(d, nowSec());    // move first, then tell the server
-  seatSend({ t: C.INPUT, d });
+  // Same correction as play.js: "your right" depends on which edge you hold,
+  // not on the raw key — see edge.rightSign in geometry.js's makeEdge.
+  const p = game.players[seat.slot];
+  const corrected = p && p.edge ? d * p.edge.rightSign : d;
+  seat.predictor.setDir(corrected, nowSec());    // move first, then tell the server
+  seatSend({ t: C.INPUT, d: corrected });
 }
 
 const KEYS_L = new Set(['ArrowLeft', 'KeyA']);
@@ -335,6 +345,22 @@ const setConn = (m) => { connEl.textContent = m; };
 
 const joinEl = document.getElementById('joinurl');
 joinEl.textContent = `${location.host}/play`;
+
+// One on/off bit, driven from either checkbox and mirrored across both — the
+// lobby copy is visible before a match starts, the HUD copy during it. This
+// is the projector's only quiz control; everything else stays teacher-console
+// only, so this never carries the actual sets/answers over the wire.
+const qToggleHud = document.getElementById('questionstoggle');
+const qToggleLobby = document.getElementById('questionstogglelobby');
+
+function onQuizState(msg) {
+  qToggleHud.checked = !!msg.enabled;
+  qToggleLobby.checked = !!msg.enabled;
+}
+
+[qToggleHud, qToggleLobby].forEach((el) => {
+  el.addEventListener('change', () => sendMsg({ t: C.QUIZ_CFG, enabled: el.checked }));
+});
 
 let lastLobbyMsg = null;
 
